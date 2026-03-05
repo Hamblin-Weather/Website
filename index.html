@@ -1,0 +1,3193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hamblin Weather Dashboard</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root{
+      --bg0:#06131f;
+      --bg1:#071a2a;
+      --stroke:#203a55;
+      --text:#e9f2ff;
+      --muted:#a8b7c9;
+      --accent:#55c3ff;
+      --shadow: 0 12px 40px rgba(0,0,0,.35);
+      --r:18px;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--text);
+      background:
+        radial-gradient(1000px 600px at 20% 10%, rgba(66, 135, 245, .18), transparent 60%),
+        radial-gradient(900px 500px at 85% 20%, rgba(0, 255, 213, .10), transparent 60%),
+        radial-gradient(900px 650px at 60% 95%, rgba(255, 167, 36, .08), transparent 60%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      transform: scale(0.985);
+      transform-origin: top center;
+    }
+
+    .wrap{ max-width: 1400px; margin: 22px auto; padding: 0 18px; }
+
+    .card{
+      background: rgba(8, 22, 36, .58);
+      border: 1px solid rgba(32, 58, 85, .75);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      overflow:hidden;
+    }
+
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      padding: 14px 14px;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-width: 320px;
+    }
+    .logo{
+      width:100px;
+      height:110px;
+      object-fit:contain;
+      display:block;
+      border-radius:12px;
+      background: transparent;
+      box-shadow:none;
+    }
+    .title{
+      display:flex;
+      flex-direction:column;
+      line-height:1.15;
+    }
+    .title h1{
+      margin:0;
+      font-size: 26px;
+      letter-spacing:.2px;
+    }
+    .title .sub{
+      margin-top:4px;
+      color:var(--muted);
+      font-size: 13px;
+    }
+    .controls{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .select, .btn, .input{
+      background: rgba(10, 26, 44, .55);
+      border: 1px solid rgba(32, 58, 85, .95);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      outline:none;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
+    }
+    .select{ cursor:pointer; }
+    .btn{
+      cursor:pointer;
+      transition: transform .05s ease, border-color .2s ease, background .2s ease;
+      user-select:none;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      line-height: 1;
+    }
+    .btn:hover{ border-color: rgba(85,195,255,.85); }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{
+      background: rgba(85,195,255,.16);
+      border-color: rgba(85,195,255,.55);
+    }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; }
+    .input{ width: min(720px, 55vw); }
+
+    /* Make dropdown list readable when opened */
+    #mapLayer option,
+    #radarOpacity option,
+    #alertsOpacity option,
+    #stateFilter option,
+    #graphCountySelect option,
+    #spcDaySelect option,
+    #satProduct option,
+    #satOpacity option{
+      color:#000;
+      background:#fff;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 430px 1fr;
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .cardHeader{
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(32,58,85,.55);
+      display:flex;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .cardHeader h2{ margin:0; font-size: 18px; letter-spacing:.2px; }
+    .small{ color:var(--muted); font-size: 13px; white-space:nowrap; }
+    .cardBody{ padding: 14px 14px; }
+
+    .list{
+      height: 610px;
+      overflow:auto;
+      padding-right: 6px;
+    }
+    .row{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      padding: 12px 12px;
+      border: 1px solid rgba(32,58,85,.45);
+      border-radius: 14px;
+      background: rgba(7, 18, 32, .35);
+      margin-bottom: 10px;
+      cursor:pointer;
+      transition: border-color .2s ease, background .2s ease, transform .05s ease;
+    }
+    .row:hover{
+      border-color: rgba(85,195,255,.55);
+      background: rgba(7, 18, 32, .52);
+    }
+    .row:active{ transform: translateY(1px); }
+    .row.active{
+      border-color: rgba(85,195,255,.95);
+      box-shadow: 0 0 0 2px rgba(85,195,255,.14);
+    }
+    .rowLeft{ display:flex; flex-direction:column; gap:4px; }
+    .rowTitle{ font-size: 18px; font-weight: 700; }
+    .rowMeta{ font-size: 13px; color: var(--muted); }
+    .badge{
+      min-width: 42px;
+      height: 34px;
+      padding: 0 10px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius: 999px;
+      border: 1px solid rgba(32,58,85,.65);
+      color: var(--text);
+      font-weight: 700;
+      background: rgba(10,26,44,.35);
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      padding: 10px 0 6px 0;
+    }
+
+    .tabs{
+      display:flex;
+      gap:10px;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+    .tab{
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(32,58,85,.65);
+      background: rgba(10,26,44,.28);
+      cursor:pointer;
+      color: var(--text);
+      font-size: 13px;
+    }
+    .tab.active{
+      border-color: rgba(85,195,255,.95);
+      background: rgba(85,195,255,.14);
+    }
+
+    .msg{
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(32,58,85,.55);
+      background: rgba(7, 18, 32, .35);
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .msg.bad{ color: #ffd3dc; border-color: rgba(251,113,133,.55); background: rgba(251,113,133,.10); }
+
+    .period{
+      padding: 12px 12px;
+      border: 1px solid rgba(32,58,85,.45);
+      border-radius: 14px;
+      background: rgba(7, 18, 32, .35);
+      margin-bottom: 10px;
+      display:flex;
+      justify-content:space-between;
+      gap:14px;
+    }
+    .periodLeft{ min-width: 210px; }
+    .pName{ font-weight:800; }
+    .pMeta{ color: var(--muted); font-size: 13px; margin-top: 2px; }
+    .pText{ color: var(--text); font-size: 14px; line-height: 1.35; opacity:.95; }
+
+    .hourRow{
+      padding: 12px 12px;
+      border: 1px solid rgba(32,58,85,.45);
+      border-radius: 14px;
+      background: rgba(7, 18, 32, .35);
+      margin-bottom: 10px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .hourLeft{ display:flex; flex-direction:column; gap:2px; }
+    .hourTime{ font-weight:800; }
+    .hourDesc{ color: var(--muted); font-size: 13px; }
+    .hourTemp{
+      font-size: 16px;
+      font-weight: 900;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(32,58,85,.65);
+      background: rgba(10,26,44,.30);
+      white-space:nowrap;
+    }
+
+    .footer{
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 6px 4px;
+    }
+
+    .view{ display:none; }
+    .view.active{ display:block; }
+
+    .mapWrap{ margin-top: 10px; }
+    #tempMap, #radarMap, #alertMap, #spcMap, #satMap{
+      height: 690px;
+      border-radius: var(--r);
+      overflow:hidden;
+      border: 1px solid rgba(32,58,85,.75);
+      box-shadow: var(--shadow);
+    }
+
+    .mapTop{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom: 10px;
+      position:relative;
+      flex-wrap:wrap;
+    }
+
+    .mapShell{ position: relative; }
+    .map-legend-wrap{
+      position:absolute;
+      right:12px;
+      bottom:12px;
+      z-index:700;
+      pointer-events:none;
+    }
+
+    .legendCard{
+      pointer-events:auto;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      padding:8px 10px;
+      border-radius:12px;
+      background: rgba(10, 25, 35, 0.42);
+      border: 1px solid rgba(255,255,255,0.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      width: 270px;
+    }
+
+    .legend-title{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-size:12px;
+      font-weight:700;
+      color: rgba(255,255,255,0.92);
+      line-height:1.1;
+      gap:10px;
+    }
+
+    .legend-bar{
+      height:10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.14);
+      box-shadow:0 6px 18px rgba(0,0,0,0.22);
+      background:#999;
+    }
+
+    .legend-ticks{
+      display:flex;
+      justify-content:space-between;
+      font-size:11px;
+      color: rgba(255,255,255,0.78);
+      padding:0 2px;
+      user-select:none;
+    }
+
+    .radar-bar{
+      height:12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.14);
+      box-shadow:0 6px 18px rgba(0,0,0,0.22);
+      background: linear-gradient(90deg,
+        rgb(4, 233, 231),
+        rgb(1, 159, 244),
+        rgb(3, 0, 244),
+        rgb(2, 253, 2),
+        rgb(1, 197, 1),
+        rgb(0, 142, 0),
+        rgb(253, 248, 2),
+        rgb(229, 188, 0),
+        rgb(253, 149, 0),
+        rgb(253, 0, 0),
+        rgb(212, 0, 0),
+        rgb(188, 0, 0),
+        rgb(248, 0, 253),
+        rgb(152, 84, 198)
+      );
+    }
+    .radar-ticks{
+      display:flex;
+      justify-content:space-between;
+      font-size:11px;
+      color: rgba(255,255,255,0.78);
+      padding:0 2px;
+      user-select:none;
+    }
+    .radar-note{
+      font-size:11px;
+      color: rgba(233,242,255,0.72);
+      line-height: 1.25;
+    }
+
+    .alert-legend-items{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      margin-top:2px;
+    }
+    .alert-item{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      font-size:12px;
+      color: rgba(233,242,255,0.90);
+    }
+    .swatch{
+      width:14px;
+      height:14px;
+      border-radius:4px;
+      border:1px solid rgba(255,255,255,0.25);
+      box-shadow:0 4px 12px rgba(0,0,0,0.25);
+      flex: 0 0 auto;
+    }
+    .alert-left{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+    }
+    .alert-name{
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 185px;
+    }
+
+    .leaflet-popup-content-wrapper{ border-radius: 14px; }
+    .leaflet-popup-content{ margin: 12px 12px; }
+
+    .hwl-alert-popup .leaflet-popup-content{
+      width: 300px !important;
+      margin: 10px 10px;
+    }
+    .hwl-popup-shell{
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color:#0b1220;
+    }
+    .hwl-popup-title{
+      font-weight: 900;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .hwl-popup-scroll{
+      max-height: 220px;
+      overflow: auto;
+      padding-right: 6px;
+    }
+    .hwl-popup-item{
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 12px;
+      padding: 8px 9px;
+      margin-bottom: 8px;
+      background: rgba(255,255,255,0.92);
+    }
+    .hwl-popup-row{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:baseline;
+    }
+    .hwl-popup-event{ font-weight: 900; font-size: 12px; }
+    .hwl-popup-sev{ font-size: 11px; font-weight: 900; opacity: 0.75; }
+    .hwl-popup-head{ font-size: 12px; margin-top: 6px; opacity: 0.92; }
+    .hwl-popup-exp{ font-size: 11px; margin-top: 6px; opacity: 0.70; }
+
+    .hwl-popup-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top: 10px;
+    }
+    .hwl-a{
+      display:inline-block;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background:#0b1220;
+      color:#fff;
+      text-decoration:none;
+      font-weight: 900;
+      font-size: 12px;
+    }
+    .hwl-a.secondary{
+      background: #eef2ff;
+      color:#0b1220;
+      border: 1px solid rgba(0,0,0,0.18);
+    }
+
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+      .list{ height: 360px; }
+      .input{ width: 100%; }
+      body{ transform: none; }
+      #tempMap, #radarMap, #alertMap, #spcMap, #satMap{ height: 68vh; min-height: 520px; }
+    }
+
+    @media (max-width: 720px){
+      .wrap{ margin: 12px auto; padding: 0 12px; }
+      .brand{ min-width: 0; width: 100%; }
+      .title h1{ font-size: 20px; }
+
+      .input{ width: 100%; }
+      .select{ width: 100%; }
+
+      .grid{ grid-template-columns: 1fr; }
+      .list{ height: 320px; }
+      .actions{ gap: 8px; }
+      .btn{ width: 100%; }
+
+      .mapTop{ flex-direction: column; align-items: stretch; }
+      #tempMap, #radarMap, #alertMap, #spcMap, #satMap{ height: 62vh; min-height: 420px; }
+      .legendCard{ width: 215px; }
+    }
+
+    #countyChart{ width: 100% !important; height: 100% !important; }
+
+    .aboutHero img,
+    .aboutWrap img{
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+    #viewAbout{ overflow-x: hidden; }
+
+    .aboutBody h2{ font-size: 20px; }
+    .aboutBody p{
+      font-size: 15.5px;
+      line-height: 1.55;
+      color: rgba(233,242,255,0.92);
+    }
+    .aboutBullets{
+      margin: 10px 0 0 0;
+      padding-left: 18px;
+      color: rgba(233,242,255,0.88);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+    .aboutBullets li{ margin-bottom: 6px; }
+
+    .socialLinks{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+      margin-top: 14px;
+    }
+    .socialCard{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(32,58,85,.55);
+      background: rgba(7, 18, 32, .35);
+      text-decoration:none;
+      color: var(--text);
+      transition: border-color .2s ease, background .2s ease, transform .05s ease;
+    }
+    .socialCard:hover{
+      border-color: rgba(85,195,255,.75);
+      background: rgba(7, 18, 32, .55);
+    }
+    .socialCard:active{ transform: translateY(1px); }
+
+    .socialIcon{
+      width:42px;
+      height:42px;
+      border-radius: 12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      font-size:18px;
+      color:#fff;
+      flex: 0 0 auto;
+    }
+    .socialText{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
+    .socialText .name{ font-weight:900; font-size:14px; }
+    .socialText .handle{ font-size:12px; color: rgba(233,242,255,0.75); }
+    .instagram{ background: linear-gradient(135deg, #f58529, #dd2a7b, #8134af, #515bd4); }
+    .facebook{ background: #1877F2; }
+
+    @media (max-width: 720px){
+      .socialLinks{ grid-template-columns: 1fr; }
+    }
+
+    .askBox{
+      margin-top: 14px;
+      padding: 12px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(32,58,85,.55);
+      background: rgba(7, 18, 32, .35);
+    }
+    .askTitle{
+      font-weight: 900;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+    .askSub{
+      color: rgba(233,242,255,0.78);
+      font-size: 13px;
+      line-height: 1.4;
+      margin-bottom: 10px;
+    }
+    .askActions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top: 10px;
+    }
+
+    #tempMap:fullscreen,
+    #radarMap:fullscreen,
+    #alertMap:fullscreen,
+    #spcMap:fullscreen,
+    #satMap:fullscreen{
+      width: 100vw !important;
+      height: 100vh !important;
+      border-radius: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: #06131f;
+    }
+    #tempMap:-webkit-full-screen,
+    #radarMap:-webkit-full-screen,
+    #alertMap:-webkit-full-screen,
+    #spcMap:-webkit-full-screen,
+    #satMap:-webkit-full-screen{
+      width: 100vw !important;
+      height: 100vh !important;
+      border-radius: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+      background: #06131f;
+    }
+
+    .hamburgerBtn{
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding: 0;
+    }
+    .hamburgerIcon{
+      width: 20px;
+      height: 14px;
+      position: relative;
+    }
+    .hamburgerIcon span{
+      position:absolute;
+      left:0;
+      right:0;
+      height:2px;
+      background: rgba(233,242,255,0.92);
+      border-radius: 999px;
+    }
+    .hamburgerIcon span:nth-child(1){ top:0; }
+    .hamburgerIcon span:nth-child(2){ top:6px; opacity: 0.95; }
+    .hamburgerIcon span:nth-child(3){ bottom:0; }
+
+    .drawerOverlay{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 3000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+    }
+
+    .drawer{
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: min(320px, 86vw);
+      background: rgba(8, 22, 36, 0.92);
+      border-right: 1px solid rgba(32,58,85,.70);
+      backdrop-filter: blur(14px);
+      z-index: 3100;
+      transform: translateX(-102%);
+      transition: transform .18s ease;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .drawerHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding: 14px 14px;
+      border-bottom: 1px solid rgba(32,58,85,.55);
+    }
+
+    .drawerTitle{
+      font-weight: 900;
+      letter-spacing: .2px;
+    }
+
+    .drawerClose{
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding: 0;
+    }
+
+    .drawerBody{
+      padding: 12px;
+      overflow:auto;
+    }
+
+    .drawerItem{
+      width: 100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding: 12px 12px;
+      border: 1px solid rgba(32,58,85,.45);
+      border-radius: 14px;
+      background: rgba(7, 18, 32, .35);
+      color: var(--text);
+      cursor:pointer;
+      margin-bottom: 10px;
+      transition: border-color .2s ease, background .2s ease, transform .05s ease;
+    }
+
+    .drawerItem:hover{
+      border-color: rgba(85,195,255,.55);
+      background: rgba(7, 18, 32, .52);
+    }
+
+    .drawerItem:active{ transform: translateY(1px); }
+
+    .drawerItem.active{
+      border-color: rgba(85,195,255,.95);
+      box-shadow: 0 0 0 2px rgba(85,195,255,.14);
+    }
+
+    .drawerHint{
+      font-size: 12px;
+      color: rgba(233,242,255,0.70);
+      padding: 0 2px;
+      margin-top: 6px;
+    }
+
+    body.drawerOpen .drawerOverlay{
+      opacity: 1;
+      pointer-events: auto;
+    }
+    body.drawerOpen .drawer{
+      transform: translateX(0);
+    }
+
+    /* Menu media: YouTube playlist + card image (16:9) */
+    .menuMediaGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    @media (max-width: 980px){
+      .menuMediaGrid{ grid-template-columns: 1fr; }
+    }
+    .menuMediaFrame{
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: var(--r);
+      overflow:hidden;
+      border: 1px solid rgba(32,58,85,.75);
+      box-shadow: var(--shadow);
+      background: rgba(7, 18, 32, .35);
+    }
+    .menuMediaFrame iframe,
+    .menuMediaFrame img{
+      width: 100%;
+      height: 100%;
+      display:block;
+      border: 0;
+      object-fit: cover;
+    }
+
+    /* Today at a glance: unified box */
+    .glanceUnified{
+      background: rgba(10, 26, 44, .55);
+      border: 1px solid rgba(32, 58, 85, .95);
+    }
+    .glanceLocLine{
+      font-weight: 900;
+      color: rgba(233,242,255,0.92);
+      font-size: 14px;
+      margin-bottom: 10px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .glanceUnifiedGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap:10px;
+    }
+    .glanceTile{
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(7, 18, 32, .35);
+      padding: 12px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      min-height: 110px;
+    }
+    .glanceTileLabel{
+      font-size: 12px;
+      color: rgba(233,242,255,0.72);
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+    .glanceTileValue{
+      font-size: 40px;
+      font-weight: 1000;
+      line-height: 1;
+    }
+    .glanceIconImg{
+      width: 72px;
+      height: 72px;
+      object-fit: contain;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,0.35));
+    }
+    .glanceIconText{
+      margin-top: 6px;
+      font-size: 12px;
+      color: rgba(233,242,255,0.86);
+      font-weight: 900;
+    }
+    .glanceUnifiedMid{
+      margin-top: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(7, 18, 32, .35);
+      padding: 12px;
+    }
+    .glanceMidTitle{
+      font-weight: 1000;
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+    .glanceMidText{
+      font-size: 14px;
+      line-height: 1.45;
+      color: rgba(233,242,255,0.92);
+    }
+    .glanceMetaRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top: 10px;
+    }
+    .glanceMetaPill{
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(10,26,44,.35);
+      padding: 8px 10px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .glanceMetaLabel{
+      color: rgba(233,242,255,0.72);
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .glanceMetaValue{
+      font-size: 13px;
+      font-weight: 1000;
+    }
+    @media (max-width: 820px){
+      .glanceUnifiedGrid{ grid-template-columns: 1fr; }
+      .glanceTileValue{ font-size: 34px; }
+    }
+  </style>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RMZPCMCJT3"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-RMZPCMCJT3');
+</script>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar card">
+      <div class="brand">
+        <img class="logo" src="logo.png" alt="Logo" />
+        <div class="title">
+          <h1>Hamblin Weather Dashboard</h1>
+          <div class="sub" id="localTime">Local time: ...</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn hamburgerBtn" id="openDrawerBtn" type="button" title="Menu">
+          <div class="hamburgerIcon" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- MENU -->
+    <div class="view active" id="viewAbout">
+      <div class="aboutWrap">
+
+        <!-- TODAY AT A GLANCE (unified) -->
+        <div class="card glanceUnified" style="margin-top:12px;">
+          <div class="cardHeader">
+            <h2>Today at a glance</h2>
+            <div class="small" id="glanceUpdated">Finding your location...</div>
+          </div>
+          <div class="cardBody">
+            <div class="glanceLocLine" id="glanceLocation">Locating...</div>
+
+            <div class="glanceUnifiedGrid">
+              <div class="glanceTile">
+                <div class="glanceTileLabel">High</div>
+                <div class="glanceTileValue" id="glanceHigh">--°</div>
+              </div>
+
+              <div class="glanceTile">
+                <img id="glanceIconImg" class="glanceIconImg" alt="Forecast icon" />
+                <div class="glanceIconText" id="glanceNowShort">Loading...</div>
+              </div>
+
+              <div class="glanceTile">
+                <div class="glanceTileLabel">Low</div>
+                <div class="glanceTileValue" id="glanceLow">--°</div>
+              </div>
+            </div>
+
+            <div class="glanceUnifiedMid">
+              <div class="glanceMidTitle">Forecast</div>
+              <div class="glanceMidText" id="glanceForecastText">Allow location to load your local forecast.</div>
+
+              <div class="glanceMetaRow">
+                <div class="glanceMetaPill">
+                  <span class="glanceMetaLabel">Now</span>
+                  <span class="glanceMetaValue" id="glanceNowTemp">--°</span>
+                </div>
+
+                <div class="glanceMetaPill">
+                  <span class="glanceMetaLabel">Rain Chance</span>
+                  <span class="glanceMetaValue" id="glanceRainChance">--%</span>
+                </div>
+
+                <div class="glanceMetaPill">
+                  <span class="glanceMetaLabel">Wind</span>
+                  <span class="glanceMetaValue" id="glanceWind">--</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="small" style="margin-top:10px; color:rgba(233,242,255,0.72);">
+              If location is blocked, use County Forecasts to pick a county.
+            </div>
+          </div>
+        </div>
+
+        <!-- YouTube playlist + card -->
+        <div class="menuMediaGrid">
+          <div class="menuMediaFrame">
+            <iframe
+              src="https://www.youtube.com/embed?listType=playlist&list=PLaHHo4-XNJtIx8Ikzg0cZDmwvJ4nPqNlR&rel=0&modestbranding=1&playsinline=1"
+              title="Hamblin Weather Daily Reel"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+              allowfullscreen></iframe>
+          </div>
+
+          <div class="menuMediaFrame">
+            <img src="card.png" alt="Hamblin Weather Card" />
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <div class="aboutBody" style="padding:14px 16px;">
+            <h2>About Hamblin Weather</h2>
+            <p>
+              Hamblin Weather provides local forecasting, weather education, and real time updates focused on the Mid South and West Tennessee region.
+              This dashboard pulls National Weather Service data to make it easier to check county forecasts, hourly trends, and current conditions across the coverage area.
+              Forecasts are created and shared for awareness and planning, and they should always be used with discretion alongside official sources, especially during severe weather.
+            </p>
+
+            <ul class="aboutBullets">
+              <li><strong>Coverage area:</strong> West Tennessee and the surrounding Mid South</li>
+              <li><strong>Update frequency:</strong> Forecasts posted three times daily, with additional updates during active weather</li>
+            </ul>
+
+            <div class="socialLinks">
+              <a class="socialCard"
+                 href="https://www.instagram.com/hamblinwx?igsh=cXcya2k0bDdoNXFk"
+                 target="_blank" rel="noopener noreferrer">
+                <div class="socialIcon instagram">IG</div>
+                <div class="socialText">
+                  <div class="name">Instagram</div>
+                  <div class="handle">@hamblinwx</div>
+                </div>
+              </a>
+
+              <a class="socialCard"
+                 href="https://www.facebook.com/share/14ZsNrzW7PD/"
+                 target="_blank" rel="noopener noreferrer">
+                <div class="socialIcon facebook">f</div>
+                <div class="socialText">
+                  <div class="name">Facebook</div>
+                  <div class="handle">Hamblin Weather</div>
+                </div>
+              </a>
+            </div>
+
+            <div class="askBox">
+              <div class="askTitle">Questions?</div>
+              <div class="askSub">
+                Have any questions about the forecast or upcoming weather? Want to submit pictures to be featured? Have any suggestions? Feel free to message me on Facebook or Instagram
+              </div>
+
+              <div class="askActions">
+                <a class="btn primary"
+                   href="https://www.instagram.com/hamblinwx?igsh=cXcya2k0bDdoNXFk"
+                   target="_blank" rel="noopener noreferrer">
+                  Message on Instagram
+                </a>
+
+                <a class="btn primary"
+                   href="https://www.facebook.com/share/14ZsNrzW7PD/"
+                   target="_blank" rel="noopener noreferrer">
+                  Message on Facebook
+                </a>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="footer">Data from api.weather.gov. Use forecasts with discretion.</div>
+      </div>
+    </div>
+
+    <!-- FORECAST -->
+    <div class="view" id="viewForecast">
+      <div class="card" style="margin-top:12px;">
+        <div class="cardBody" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+          <input class="input" id="searchBox" placeholder="Search county or state, example: Weakley or TN" />
+          <select class="select" id="stateFilter" title="State filter">
+            <option value="">All states</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="cardHeader">
+            <h2>Counties</h2>
+            <div class="small" id="countMeta">0 shown, 0 loaded</div>
+          </div>
+          <div class="cardBody">
+            <div class="list" id="countyList"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="cardHeader">
+            <h2 id="detailTitle">Select a county</h2>
+            <div class="small" id="detailMeta">FIPS: n/a · n/a</div>
+          </div>
+          <div class="cardBody">
+            <div class="actions">
+              <button class="btn primary" id="btnForecast" type="button" disabled>Get forecast</button>
+              <button class="btn primary" id="btnHourly" type="button" disabled>Get hourly</button>
+              <button class="btn" id="btnNWS" type="button" disabled>Open on NWS</button>
+            </div>
+
+            <div class="tabs">
+              <div class="tab active" id="tabForecast">Forecast</div>
+              <div class="tab" id="tabHourly">Hourly</div>
+            </div>
+
+            <div class="msg" id="messageBox">Pick a county on the left.</div>
+
+            <div id="forecastPane"></div>
+            <div id="hourlyPane" style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">Data from api.weather.gov. Use forecasts with discretion.</div>
+    </div>
+
+    <!-- TEMPS -->
+    <div class="view" id="viewTemps">
+      <div class="mapWrap">
+        <div class="mapTop">
+          <div class="btn" style="cursor:default;">Interactive Map</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <select class="select" id="mapLayer" title="Map data">
+              <option value="temp">Temperature</option>
+              <option value="dew">Dewpoint</option>
+              <option value="wind">Wind</option>
+              <option value="pop">Rain chance</option>
+            </select>
+            <button class="btn" id="tempFullscreenBtn" type="button">Fullscreen</button>
+          </div>
+        </div>
+
+        <div class="mapShell">
+          <div id="tempMap"></div>
+
+          <div class="map-legend-wrap">
+            <div class="legendCard" id="tempLegend">
+              <div class="legend-title">
+                <span id="tempLegendTitle">Temperature (°F)</span>
+                <span style="color:rgba(233,242,255,0.78); font-weight:600;">Now</span>
+              </div>
+              <div class="legend-bar" id="tempLegendBar"></div>
+              <div class="legend-ticks" id="tempLegendTicks"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">Map values are pulled from the NWS hourly forecast for each county.</div>
+      </div>
+    </div>
+
+    <!-- RADAR -->
+    <div class="view" id="viewRadar">
+      <div class="mapWrap">
+        <div class="mapTop">
+          <div class="btn" style="cursor:default;">Radar</div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <button class="btn primary" id="radarRefreshBtn" type="button">Refresh radar</button>
+            <select class="select" id="radarOpacity" title="Radar opacity">
+              <option value="0.25">Radar 25%</option>
+              <option value="0.40">Radar 40%</option>
+              <option value="0.55" selected>Radar 55%</option>
+              <option value="0.70">Radar 70%</option>
+              <option value="0.85">Radar 85%</option>
+            </select>
+            <button class="btn" id="radarFullscreenBtn" type="button">Fullscreen</button>
+          </div>
+        </div>
+
+        <div class="mapShell">
+          <div id="radarMap"></div>
+
+          <div class="map-legend-wrap">
+            <div class="legendCard" id="radarLegend">
+              <div class="legend-title">
+                <span>Radar reflectivity (approx dBZ)</span>
+                <span id="radarLegendTime" style="color:rgba(233,242,255,0.78); font-weight:600;">Current</span>
+              </div>
+              <div class="radar-bar"></div>
+              <div class="radar-ticks">
+                <span>5</span><span>20</span><span>35</span><span>50</span><span>65+</span>
+              </div>
+              <div class="radar-note">Blue/green light, yellow/orange moderate, red/purple heavy.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">Radar overlay is a national composite. Your counties are outlined in black.</div>
+      </div>
+    </div>
+
+    <!-- SATELLITE -->
+    <div class="view" id="viewSat">
+      <div class="mapWrap">
+        <div class="mapTop">
+          <div class="btn" style="cursor:default;">Satellite</div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <select class="select" id="satProduct" title="Satellite product">
+              <option value="GOES-East_ABI_GeoColor" selected>GOES-East GeoColor (Live)</option>
+              <option value="GOES-West_ABI_GeoColor">GOES-West GeoColor (Live)</option>
+            </select>
+
+            <select class="select" id="satOpacity" title="Satellite opacity">
+              <option value="0.35">35%</option>
+              <option value="0.50">50%</option>
+              <option value="0.65" selected>65%</option>
+              <option value="0.80">80%</option>
+              <option value="0.95">95%</option>
+            </select>
+
+            <button class="btn primary" id="satRefreshBtn" type="button">Refresh satellite</button>
+            <button class="btn" id="satFullscreenBtn" type="button">Fullscreen</button>
+          </div>
+        </div>
+
+        <div class="mapShell">
+          <div id="satMap"></div>
+
+          <div class="map-legend-wrap">
+            <div class="legendCard">
+              <div class="legend-title">
+                <span id="satLegendTitle">GOES</span>
+                <span id="satLegendTime" style="color:rgba(233,242,255,0.78); font-weight:600;">Live</span>
+              </div>
+              <div style="color:rgba(233,242,255,0.72); font-size:11px; line-height:1.25;">
+                GOES GeoColor via NASA GIBS (default time).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">GOES imagery uses the latest available time.</div>
+      </div>
+    </div>
+
+    <!-- ALERTS -->
+    <div class="view" id="viewAlerts">
+      <div class="mapWrap">
+        <div class="mapTop">
+          <div class="btn" style="cursor:default;">Watches and Warnings</div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <button class="btn primary" id="alertsRefreshBtn" type="button">Refresh alerts</button>
+            <select class="select" id="alertsOpacity" title="Alert fill opacity">
+              <option value="0.35">Fill 35%</option>
+              <option value="0.50">Fill 50%</option>
+              <option value="0.60" selected>Fill 60%</option>
+              <option value="0.75">Fill 75%</option>
+            </select>
+            <button class="btn" id="alertsFullscreenBtn" type="button">Fullscreen</button>
+          </div>
+        </div>
+
+        <div class="mapShell">
+          <div id="alertMap"></div>
+
+          <div class="map-legend-wrap">
+            <div class="legendCard" id="alertLegend">
+              <div class="legend-title">
+                <span>Active alert types</span>
+                <span id="alertLegendMeta" style="color:rgba(233,242,255,0.78); font-weight:600;">0 counties</span>
+              </div>
+              <div class="alert-legend-items" id="alertLegendItems"></div>
+              <div style="margin-top:2px; color:rgba(233,242,255,0.72); font-size:11px; line-height:1.25;">
+                Click a county for a scrollable popup with official links.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">Alerts come from api.weather.gov and are fetched only for states in your counties list.</div>
+      </div>
+    </div>
+
+    <!-- SPC OUTLOOK -->
+    <div class="view" id="viewSpc">
+      <div class="mapWrap">
+        <div class="mapTop">
+          <div class="btn" style="cursor:default;">SPC Outlook</div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <select class="select" id="spcDaySelect" title="SPC Day">
+              <option value="1" selected>Day 1 Categorical</option>
+              <option value="2">Day 2 Categorical</option>
+              <option value="3">Day 3 Categorical</option>
+            </select>
+
+            <button class="btn primary" id="spcRefreshBtn" type="button">Refresh SPC</button>
+            <button class="btn" id="spcFullscreenBtn" type="button">Fullscreen</button>
+          </div>
+        </div>
+
+        <div class="mapShell">
+          <div id="spcMap"></div>
+
+          <div class="map-legend-wrap">
+            <div class="legendCard" id="spcLegend">
+              <div class="legend-title">
+                <span>SPC categorical risk</span>
+                <span id="spcLegendTime" style="color:rgba(233,242,255,0.78); font-weight:600;">Current</span>
+              </div>
+
+              <div class="alert-legend-items" id="spcLegendItems"></div>
+
+              <div style="margin-top:2px; color:rgba(233,242,255,0.72); font-size:11px; line-height:1.25;">
+                Source: NOAA SPC outlook polygons.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">SPC outlook polygons are pulled from NOAA map services.</div>
+      </div>
+    </div>
+
+    <!-- GRAPHS -->
+    <div class="view" id="viewGraphs">
+      <div class="card" style="margin-top:12px;">
+        <div class="cardHeader">
+          <h2>County graphs</h2>
+          <div class="small" id="graphsMeta">Next 12 hours</div>
+        </div>
+
+        <div class="cardBody">
+          <div class="actions" style="justify-content:space-between; align-items:center;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <input class="input" id="graphSearch" placeholder="Search county, example: Weakley or Shelby" style="width:min(520px, 60vw);" />
+              <select class="select" id="graphCountySelect" title="Select county">
+                <option value="">Select a county</option>
+              </select>
+            </div>
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <button class="btn primary" id="graphLoadBtn" type="button" disabled>Load 12 hour graph</button>
+            </div>
+          </div>
+
+          <div class="msg" id="graphMsg">Pick a county to graph the next 12 hours.</div>
+
+          <div style="height:560px; margin-top:10px;">
+            <canvas id="countyChart"></canvas>
+          </div>
+
+          <div class="footer" style="padding-left:0; padding-right:0;">
+            Graph data comes from the NWS hourly forecast for the selected county’s gridpoint.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWER -->
+  <div class="drawerOverlay" id="drawerOverlay"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawerHeader">
+      <div class="drawerTitle">Hamblin Weather</div>
+      <button class="btn drawerClose" id="closeDrawerBtn" type="button" title="Close">✕</button>
+    </div>
+
+    <div class="drawerBody" id="drawerList">
+      <div class="drawerItem" data-view="about">Menu</div>
+      <div class="drawerItem" data-view="forecast">County Forecasts</div>
+      <div class="drawerItem" data-view="temps">Interactive Map</div>
+      <div class="drawerItem" data-view="radar">Radar</div>
+      <div class="drawerItem" data-view="sat">Satellite</div>
+      <div class="drawerItem" data-view="alerts">Watches and Warnings</div>
+      <div class="drawerItem" data-view="graphs">County Forecast Graphs</div>
+      <div class="drawerItem" data-view="spc">SPC Outlook</div>
+
+      <div class="drawerHint">Tip: Tap a page to switch.</div>
+    </div>
+  </div>
+
+  <script>
+    const COUNTIES_JSON = "counties.json";
+    const COUNTIES_GEOJSON = "counties.geojson";
+
+    let counties = [];
+    let countiesById = {};
+    let selected = null;
+
+    let forecastData = null;
+    let hourlyData = null;
+
+    let tempMap = null;
+    let tempGeoLayer = null;
+    let tempLabelLayer = null;
+    let layerValuesByGeoid = {};
+    let currentMapLayer = "temp";
+    let hourlyCache = {};
+
+    let radarMap = null;
+    let radarCountyOutline = null;
+    let radarWmsLayer = null;
+
+    let satMap = null;
+    let satLayer = null;
+    let satCountyOutline = null;
+
+    let alertMap = null;
+    let alertCountyLayer = null;
+    let alertsByCounty = {};
+    let alertsByGeoid = {};
+    let alertFillOpacity = 0.60;
+
+    let countyChart = null;
+    let currentView = "about";
+
+    let spcMap = null;
+    let spcOutlookLayer = null;
+    let spcCountyOutline = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    function on(id, ev, fn){
+      const el = document.getElementById(id);
+      if (!el){
+        console.warn("Missing element:", id);
+        return;
+      }
+      el.addEventListener(ev, fn);
+    }
+
+    function safeNum(x){
+      const n = Number(x);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function pad5(x){ return String(x).padStart(5, "0"); }
+    function uniq(arr){ return Array.from(new Set(arr)); }
+
+    function fmtLocalTime(){
+      const now = new Date();
+      const s = new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true
+      }).format(now);
+      const el = $("localTime");
+      if (el) el.textContent = "Local time: " + s;
+    }
+
+    function toHourLabel(iso){
+      const d = new Date(iso);
+      return new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true
+      }).format(d);
+    }
+
+    async function fetchJson(url){
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) throw new Error(`${url} failed (${r.status})`);
+      return await r.json();
+    }
+
+    function debounce(fn, ms){
+      let t = null;
+      return (...args) => {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => fn(...args), ms);
+      };
+    }
+
+    function invalidateMap(m){
+      if (!m) return;
+      setTimeout(() => m.invalidateSize(true), 80);
+    }
+
+    async function toggleMapFullscreen(containerId, mapObj){
+      const el = document.getElementById(containerId);
+      if (!el) return;
+
+      try{
+        if (document.fullscreenElement){
+          await document.exitFullscreen();
+        }else{
+          await el.requestFullscreen();
+        }
+      }catch{
+        alert("Fullscreen is not available in this browser.");
+      }
+
+      setTimeout(() => {
+        try{ if (mapObj) mapObj.invalidateSize(true); }catch{}
+      }, 160);
+    }
+
+    document.addEventListener("fullscreenchange", () => {
+      setTimeout(() => {
+        try{ if (tempMap) tempMap.invalidateSize(true); }catch{}
+        try{ if (radarMap) radarMap.invalidateSize(true); }catch{}
+        try{ if (satMap) satMap.invalidateSize(true); }catch{}
+        try{ if (alertMap) alertMap.invalidateSize(true); }catch{}
+        try{ if (spcMap) spcMap.invalidateSize(true); }catch{}
+      }, 160);
+    });
+
+    function openDrawer(){ document.body.classList.add("drawerOpen"); }
+    function closeDrawer(){ document.body.classList.remove("drawerOpen"); }
+    function setDrawerActive(view){
+      document.querySelectorAll("#drawerList .drawerItem").forEach(el => {
+        el.classList.toggle("active", el.dataset.view === view);
+      });
+    }
+
+    /* =========================
+       Today at a glance (location based)
+       Uses built-in SVG icons (no extra files)
+       ========================= */
+
+    function svgDataUri(svg){
+      const s = svg.trim()
+        .replace(/\n+/g, "")
+        .replace(/\t+/g, " ")
+        .replace(/\s{2,}/g, " ");
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(s);
+    }
+
+    const ICONS = {
+      sunny: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><radialGradient id="g" cx="40%" cy="35%" r="60%"><stop offset="0" stop-color="#fff4b3"/><stop offset="1" stop-color="#ffd34d"/></radialGradient></defs>
+        <circle cx="64" cy="64" r="28" fill="url(#g)"/>
+        <g stroke="#ffd34d" stroke-width="6" stroke-linecap="round">
+          <line x1="64" y1="10" x2="64" y2="26"/><line x1="64" y1="102" x2="64" y2="118"/>
+          <line x1="10" y1="64" x2="26" y2="64"/><line x1="102" y1="64" x2="118" y2="64"/>
+          <line x1="22" y1="22" x2="34" y2="34"/><line x1="94" y1="94" x2="106" y2="106"/>
+          <line x1="22" y1="106" x2="34" y2="94"/><line x1="94" y1="34" x2="106" y2="22"/>
+        </g>
+      </svg>`),
+      partly: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs>
+          <radialGradient id="sun" cx="40%" cy="35%" r="60%"><stop offset="0" stop-color="#fff4b3"/><stop offset="1" stop-color="#ffd34d"/></radialGradient>
+          <linearGradient id="c" x1="0" x2="1"><stop offset="0" stop-color="#e9f2ff"/><stop offset="1" stop-color="#cfd8e6"/></linearGradient>
+        </defs>
+        <circle cx="50" cy="48" r="20" fill="url(#sun)"/>
+        <g stroke="#ffd34d" stroke-width="5" stroke-linecap="round" opacity="0.9">
+          <line x1="50" y1="16" x2="50" y2="26"/><line x1="50" y1="70" x2="50" y2="80"/>
+          <line x1="18" y1="48" x2="28" y2="48"/><line x1="72" y1="48" x2="82" y2="48"/>
+        </g>
+        <path d="M42 88h42a18 18 0 0 0 0-36 22 22 0 0 0-43-6 16 16 0 0 0 1 42z" fill="url(#c)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+      </svg>`),
+      cloudy: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="c" x1="0" x2="1"><stop offset="0" stop-color="#e9f2ff"/><stop offset="1" stop-color="#cfd8e6"/></linearGradient></defs>
+        <path d="M30 92h64a20 20 0 0 0 0-40 26 26 0 0 0-51-7 18 18 0 0 0-13 47z" fill="url(#c)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+        <path d="M18 84h52a16 16 0 0 0 0-32 20 20 0 0 0-39-6 14 14 0 0 0-13 38z" fill="rgba(233,242,255,0.85)"/>
+      </svg>`),
+      rain: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="c" x1="0" x2="1"><stop offset="0" stop-color="#e9f2ff"/><stop offset="1" stop-color="#cfd8e6"/></linearGradient></defs>
+        <path d="M28 78h72a20 20 0 0 0 0-40 26 26 0 0 0-51-7 18 18 0 0 0-21 47z" fill="url(#c)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+        <g stroke="#55c3ff" stroke-width="6" stroke-linecap="round" opacity="0.95">
+          <line x1="44" y1="88" x2="38" y2="104"/>
+          <line x1="64" y1="88" x2="58" y2="104"/>
+          <line x1="84" y1="88" x2="78" y2="104"/>
+        </g>
+      </svg>`),
+      tstorms: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="c" x1="0" x2="1"><stop offset="0" stop-color="#e9f2ff"/><stop offset="1" stop-color="#cfd8e6"/></linearGradient></defs>
+        <path d="M26 76h74a20 20 0 0 0 0-40 26 26 0 0 0-51-7 18 18 0 0 0-23 47z" fill="url(#c)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+        <path d="M64 80l-14 22h14l-10 22 28-28H68l10-16z" fill="#ffd34d" stroke="rgba(0,0,0,0.15)" stroke-width="2" stroke-linejoin="round"/>
+        <g stroke="#55c3ff" stroke-width="6" stroke-linecap="round" opacity="0.95">
+          <line x1="38" y1="88" x2="32" y2="104"/>
+          <line x1="92" y1="88" x2="86" y2="104"/>
+        </g>
+      </svg>`),
+      snow: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="c" x1="0" x2="1"><stop offset="0" stop-color="#e9f2ff"/><stop offset="1" stop-color="#cfd8e6"/></linearGradient></defs>
+        <path d="M26 76h74a20 20 0 0 0 0-40 26 26 0 0 0-51-7 18 18 0 0 0-23 47z" fill="url(#c)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+        <g fill="#e9f2ff" opacity="0.95">
+          <circle cx="46" cy="96" r="5"/><circle cx="64" cy="104" r="5"/><circle cx="82" cy="96" r="5"/>
+        </g>
+      </svg>`),
+      fog: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="c" x1="0" x2="1"><stop offset="0" stop-color="#e9f2ff"/><stop offset="1" stop-color="#cfd8e6"/></linearGradient></defs>
+        <path d="M26 72h74a20 20 0 0 0 0-40 26 26 0 0 0-51-7 18 18 0 0 0-23 47z" fill="url(#c)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+        <g stroke="rgba(233,242,255,0.85)" stroke-width="6" stroke-linecap="round">
+          <line x1="22" y1="86" x2="106" y2="86"/>
+          <line x1="30" y1="98" x2="98" y2="98"/>
+          <line x1="26" y1="110" x2="102" y2="110"/>
+        </g>
+      </svg>`),
+      wind: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <g fill="none" stroke="#e9f2ff" stroke-width="7" stroke-linecap="round" opacity="0.95">
+          <path d="M18 50h62c10 0 16-6 16-14s-6-14-14-14c-7 0-12 4-13 10"/>
+          <path d="M18 72h78c8 0 14 6 14 14s-6 14-14 14c-7 0-12-4-13-10"/>
+          <path d="M18 92h50"/>
+        </g>
+      </svg>`),
+      default: svgDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+        <defs><linearGradient id="c" x1="0" x2="1"><stop offset="0" stop-color="#e9f2ff"/><stop offset="1" stop-color="#cfd8e6"/></linearGradient></defs>
+        <path d="M30 88h64a20 20 0 0 0 0-40 26 26 0 0 0-51-7 18 18 0 0 0-13 47z" fill="url(#c)" stroke="rgba(255,255,255,0.35)" stroke-width="2"/>
+      </svg>`)
+    };
+
+    function iconKeyFromText(text){
+      const s = String(text || "").toLowerCase();
+      if (s.includes("thunder")) return "tstorms";
+      if (s.includes("tstorm")) return "tstorms";
+      if (s.includes("snow") || s.includes("sleet") || s.includes("flurr")) return "snow";
+      if (s.includes("freezing") || s.includes("ice")) return "snow";
+      if (s.includes("rain") || s.includes("shower") || s.includes("drizzle")) return "rain";
+      if (s.includes("fog") || s.includes("mist") || s.includes("haze")) return "fog";
+      if (s.includes("wind")) return "wind";
+      if (s.includes("clear") || s.includes("sunny")) return "sunny";
+      if (s.includes("partly")) return "partly";
+      if (s.includes("cloudy") || s.includes("overcast")) return "cloudy";
+      return "default";
+    }
+
+    function fmtTimeShort(){
+      return new Intl.DateTimeFormat(undefined, { hour:"numeric", minute:"2-digit", hour12:true }).format(new Date());
+    }
+
+    function pickCurrentHourly(periods){
+      if (!Array.isArray(periods) || !periods.length) return null;
+      const now = Date.now();
+      for (const p of periods){
+        const st = p.startTime ? Date.parse(p.startTime) : null;
+        const et = p.endTime ? Date.parse(p.endTime) : null;
+        if (Number.isFinite(st) && Number.isFinite(et) && now >= st && now < et) return p;
+      }
+      return periods[0];
+    }
+
+    function findTodayHiLo(dailyPeriods){
+      let hi = null;
+      let lo = null;
+      for (const p of (dailyPeriods || [])){
+        if (hi == null && p.isDaytime === true && Number.isFinite(p.temperature)) hi = p.temperature;
+        if (lo == null && p.isDaytime === false && Number.isFinite(p.temperature)) lo = p.temperature;
+        if (hi != null && lo != null) break;
+      }
+      return { hi, lo };
+    }
+
+    async function loadGlanceFromLatLon(lat, lon){
+      const pt = await fetchJson(`https://api.weather.gov/points/${lat},${lon}`);
+      const forecastUrl = pt?.properties?.forecast;
+      const hourlyUrl = pt?.properties?.forecastHourly;
+      const countyUrl = pt?.properties?.county;
+
+      if (!forecastUrl || !hourlyUrl) throw new Error("NWS point lookup did not return forecast links.");
+
+      let countyName = "";
+      let countyState = "";
+      if (countyUrl){
+        try{
+          const c = await fetchJson(countyUrl);
+          countyName = c?.properties?.name || "";
+          countyState = c?.properties?.state || "";
+        }catch{}
+      }
+
+      const daily = await fetchJson(forecastUrl);
+      const hourly = await fetchJson(hourlyUrl);
+
+      const dailyPeriods = daily?.properties?.periods || [];
+      const hourlyPeriods = hourly?.properties?.periods || [];
+
+      const cur = pickCurrentHourly(hourlyPeriods);
+      const { hi, lo } = findTodayHiLo(dailyPeriods);
+
+      const nowTemp = cur?.temperature;
+      const nowUnit = cur?.temperatureUnit || "F";
+      const nowShort = cur?.shortForecast || "Current conditions";
+      const wind = (cur?.windDirection && cur?.windSpeed) ? `${cur.windDirection} ${cur.windSpeed}` : (cur?.windSpeed || "--");
+      const pop = (cur?.probabilityOfPrecipitation?.value != null) ? Math.round(cur.probabilityOfPrecipitation.value) : null;
+      const dailyText = (dailyPeriods[0]?.detailedForecast || dailyPeriods[0]?.shortForecast || nowShort || "").trim();
+
+      if ($("glanceUpdated")) $("glanceUpdated").textContent = `Updated ${fmtTimeShort()}`;
+      if ($("glanceLocation")){
+        const loc = countyName ? `${countyName} County${countyState ? ", " + countyState : ""}` : "Your location";
+        $("glanceLocation").textContent = loc;
+      }
+
+      if ($("glanceHigh")) $("glanceHigh").textContent = (hi != null) ? `${hi}°` : "--°";
+      if ($("glanceLow")) $("glanceLow").textContent = (lo != null) ? `${lo}°` : "--°";
+      if ($("glanceNowTemp")) $("glanceNowTemp").textContent = (nowTemp != null) ? `${nowTemp}°${nowUnit}` : "--°";
+      if ($("glanceRainChance")) $("glanceRainChance").textContent = (pop != null) ? `${pop}%` : "--%";
+      if ($("glanceWind")) $("glanceWind").textContent = wind || "--";
+      if ($("glanceNowShort")) $("glanceNowShort").textContent = nowShort || "Loading...";
+      if ($("glanceForecastText")) $("glanceForecastText").textContent = dailyText || "No forecast text available.";
+
+      const iconKey = iconKeyFromText(nowShort);
+      const img = $("glanceIconImg");
+      if (img){
+        img.src = ICONS[iconKey] || ICONS.default;
+      }
+    }
+
+    function initTodayAtAGlance(){
+      if ($("glanceUpdated")) $("glanceUpdated").textContent = "Requesting location...";
+      if ($("glanceLocation")) $("glanceLocation").textContent = "Locating...";
+
+      if (!navigator.geolocation){
+        if ($("glanceUpdated")) $("glanceUpdated").textContent = "Unavailable";
+        if ($("glanceForecastText")) $("glanceForecastText").textContent = "Your browser does not support location. Use County Forecasts to pick a county.";
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude.toFixed(4);
+          const lon = pos.coords.longitude.toFixed(4);
+          try{
+            await loadGlanceFromLatLon(lat, lon);
+          }catch(e){
+            console.warn(e);
+            if ($("glanceUpdated")) $("glanceUpdated").textContent = "Error";
+            if ($("glanceForecastText")) $("glanceForecastText").textContent = "Could not load local snapshot. Try again later, or use County Forecasts.";
+          }
+        },
+        (err) => {
+          console.warn(err);
+          if ($("glanceUpdated")) $("glanceUpdated").textContent = "Location blocked";
+          if ($("glanceForecastText")) $("glanceForecastText").textContent = "Location blocked. Allow location for a snapshot, or use County Forecasts.";
+        },
+        { enableHighAccuracy: false, timeout: 9000, maximumAge: 600000 }
+      );
+    }
+
+    /* =========================
+       Counties + Forecast view
+       ========================= */
+
+    async function loadCounties(){
+      if ($("countyList")) $("countyList").innerHTML = "";
+      if ($("countMeta")) $("countMeta").textContent = "0 shown, 0 loaded";
+
+      selected = null;
+      forecastData = null;
+      hourlyData = null;
+      renderDetail();
+
+      const data = await fetchJson(COUNTIES_JSON);
+      counties = Array.isArray(data) ? data : [];
+      countiesById = Object.fromEntries(counties.map(c => [pad5(c.id), c]));
+
+      const stEl = $("stateFilter");
+      if (stEl){
+        const states = uniq(counties.map(c => c.state)).sort();
+        stEl.innerHTML = `<option value="">All states</option>` + states.map(s => `<option value="${s}">${s}</option>`).join("");
+      }
+
+      applyFilters();
+    }
+
+    function applyFilters(){
+      const root = $("countyList");
+      if (!root) return;
+
+      const q = ($("searchBox")?.value || "").trim().toLowerCase();
+      const st = ($("stateFilter")?.value || "");
+
+      let filtered = counties.slice();
+      if (st) filtered = filtered.filter(c => c.state === st);
+      if (q){
+        filtered = filtered.filter(c => {
+          const name = (c.county + " " + c.state).toLowerCase();
+          return name.includes(q) || c.state.toLowerCase().includes(q);
+        });
+      }
+
+      renderList(filtered);
+      if ($("countMeta")) $("countMeta").textContent = `${filtered.length} shown, ${counties.length} loaded`;
+    }
+
+    function renderList(list){
+      const root = $("countyList");
+      if (!root) return;
+      root.innerHTML = "";
+
+      for (const c of list){
+        const row = document.createElement("div");
+        row.className = "row" + (selected && selected.id === c.id ? " active" : "");
+        row.addEventListener("click", () => selectCounty(c));
+
+        const left = document.createElement("div");
+        left.className = "rowLeft";
+
+        const t = document.createElement("div");
+        t.className = "rowTitle";
+        t.textContent = c.county + " County";
+
+        const m = document.createElement("div");
+        m.className = "rowMeta";
+        const lat = safeNum(c?.centroid?.lat);
+        const lon = safeNum(c?.centroid?.lon);
+        m.textContent = `${c.state} · ${lat != null ? lat.toFixed(2) : "n/a"}, ${lon != null ? lon.toFixed(2) : "n/a"}`;
+
+        left.appendChild(t);
+        left.appendChild(m);
+
+        const badge = document.createElement("div");
+        badge.className = "badge";
+        badge.textContent = c.state;
+
+        row.appendChild(left);
+        row.appendChild(badge);
+        root.appendChild(row);
+      }
+    }
+
+    function selectCounty(c){
+      selected = c;
+      forecastData = null;
+      hourlyData = null;
+      renderDetail();
+      applyFilters();
+    }
+
+    function renderDetail(){
+      const has = !!selected;
+      if ($("detailTitle")) $("detailTitle").textContent = has ? `${selected.county} County, ${selected.state}` : "Select a county";
+
+      const lat = safeNum(selected?.centroid?.lat);
+      const lon = safeNum(selected?.centroid?.lon);
+
+      if ($("detailMeta")){
+        $("detailMeta").textContent = has
+          ? `FIPS: ${pad5(selected.id)} · ${lat != null ? lat.toFixed(2) : "n/a"}, ${lon != null ? lon.toFixed(2) : "n/a"}`
+          : "FIPS: n/a · n/a";
+      }
+
+      if ($("btnForecast")) $("btnForecast").disabled = !has;
+      if ($("btnHourly")) $("btnHourly").disabled = !has;
+      if ($("btnNWS")) $("btnNWS").disabled = !has;
+
+      if (!forecastData && $("forecastPane")) $("forecastPane").innerHTML = "";
+      if (!hourlyData && $("hourlyPane")) $("hourlyPane").innerHTML = "";
+    }
+
+    function openNWSMapClick(){
+      if (!selected) return;
+      const lat = safeNum(selected?.centroid?.lat);
+      const lon = safeNum(selected?.centroid?.lon);
+      if (lat == null || lon == null){
+        const box = $("messageBox");
+        if (box){
+          box.textContent = "Missing centroid lat/lon for this county.";
+          box.className = "msg bad";
+        }
+        return;
+      }
+      const url = `https://forecast.weather.gov/MapClick.php?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+
+    async function getForecast(){
+      if (!selected) return;
+      const box = $("messageBox");
+      if (box){ box.textContent = "Loading forecast..."; box.className = "msg"; }
+
+      try{
+        const url = selected?.nws?.forecast;
+        if (!url) throw new Error("No forecast URL in counties.json for this county.");
+        forecastData = await fetchJson(url);
+
+        if (box){ box.textContent = "Forecast loaded."; box.className = "msg"; }
+        showTab("forecast");
+        renderForecast();
+      }catch(err){
+        if (box){ box.textContent = String(err.message || err); box.className = "msg bad"; }
+      }
+    }
+
+    async function getHourly(){
+      if (!selected) return;
+      const box = $("messageBox");
+      if (box){ box.textContent = "Loading hourly..."; box.className = "msg"; }
+
+      try{
+        const url = selected?.nws?.forecastHourly;
+        if (!url) throw new Error("No hourly URL in counties.json for this county.");
+        hourlyData = await fetchJson(url);
+
+        if (box){ box.textContent = "Hourly loaded."; box.className = "msg"; }
+        showTab("hourly");
+        renderHourly();
+      }catch(err){
+        if (box){ box.textContent = String(err.message || err); box.className = "msg bad"; }
+      }
+    }
+
+    function renderForecast(){
+      const pane = $("forecastPane");
+      if (!pane) return;
+      pane.innerHTML = "";
+
+      const periods = forecastData?.properties?.periods;
+      if (!Array.isArray(periods) || periods.length === 0){
+        pane.innerHTML = `<div class="msg bad">No forecast periods returned.</div>`;
+        return;
+      }
+
+      for (const p of periods){
+        const wrap = document.createElement("div");
+        wrap.className = "period";
+
+        const left = document.createElement("div");
+        left.className = "periodLeft";
+
+        const name = document.createElement("div");
+        name.className = "pName";
+        name.textContent = p.name || "Period";
+
+        const meta = document.createElement("div");
+        meta.className = "pMeta";
+        const temp = (p.temperature != null) ? `${p.temperature}°${p.temperatureUnit || "F"}` : "";
+        const wind = (p.windSpeed && p.windDirection) ? `${p.windDirection} ${p.windSpeed}` : "";
+        meta.textContent = [temp, wind].filter(Boolean).join(" · ");
+
+        left.appendChild(name);
+        left.appendChild(meta);
+
+        const right = document.createElement("div");
+        right.className = "pText";
+        right.textContent = p.detailedForecast || p.shortForecast || "";
+
+        wrap.appendChild(left);
+        wrap.appendChild(right);
+        pane.appendChild(wrap);
+      }
+    }
+
+    function renderHourly(){
+      const pane = $("hourlyPane");
+      if (!pane) return;
+      pane.innerHTML = "";
+
+      const periods = hourlyData?.properties?.periods;
+      if (!Array.isArray(periods) || periods.length === 0){
+        pane.innerHTML = `<div class="msg bad">No hourly periods returned.</div>`;
+        return;
+      }
+
+      const take = periods.slice(0, 24);
+      for (const h of take){
+        const row = document.createElement("div");
+        row.className = "hourRow";
+
+        const left = document.createElement("div");
+        left.className = "hourLeft";
+
+        const time = document.createElement("div");
+        time.className = "hourTime";
+        time.textContent = h.startTime ? toHourLabel(h.startTime) : "Hour";
+
+        const desc = document.createElement("div");
+        desc.className = "hourDesc";
+        desc.textContent = h.shortForecast || "";
+
+        left.appendChild(time);
+        left.appendChild(desc);
+
+        const temp = document.createElement("div");
+        temp.className = "hourTemp";
+        temp.textContent = (h.temperature != null) ? `${h.temperature}°${h.temperatureUnit || "F"}` : "n/a";
+
+        row.appendChild(left);
+        row.appendChild(temp);
+        pane.appendChild(row);
+      }
+    }
+
+    function showTab(which){
+      const isForecast = which === "forecast";
+      if ($("tabForecast")) $("tabForecast").classList.toggle("active", isForecast);
+      if ($("tabHourly")) $("tabHourly").classList.toggle("active", !isForecast);
+
+      if ($("forecastPane")) $("forecastPane").style.display = isForecast ? "" : "none";
+      if ($("hourlyPane")) $("hourlyPane").style.display = isForecast ? "none" : "";
+    }
+
+    /* =========================
+       Temperature map values
+       ========================= */
+
+    function mphFromWindSpeedText(s){
+      if (!s) return null;
+      const m = String(s).match(/(\d+)\s*(?:to\s*(\d+))?\s*mph/i);
+      if (!m) return null;
+      const a = Number(m[1]);
+      const b = m[2] ? Number(m[2]) : null;
+      if (!Number.isFinite(a)) return null;
+      if (b && Number.isFinite(b)) return Math.round((a + b) / 2);
+      return a;
+    }
+
+    function pickCurrentHourlyPeriod(periods){
+      if (!Array.isArray(periods) || periods.length === 0) return null;
+      const now = Date.now();
+      for (const p of periods){
+        const st = p.startTime ? Date.parse(p.startTime) : null;
+        const et = p.endTime ? Date.parse(p.endTime) : null;
+        if (Number.isFinite(st) && Number.isFinite(et) && now >= st && now < et) return p;
+      }
+      return periods[0];
+    }
+
+    async function fetchHourlyForCounty(c){
+      const geoid = pad5(c.id);
+      if (hourlyCache[geoid]) return hourlyCache[geoid];
+      const url = c?.nws?.forecastHourly;
+      if (!url) return null;
+      const data = await fetchJson(url);
+      hourlyCache[geoid] = data;
+      return data;
+    }
+
+    async function getCountyLayerValue(c, layerKey){
+      const h = await fetchHourlyForCounty(c);
+      const p = pickCurrentHourlyPeriod(h?.properties?.periods);
+      if (!p) return { n: null, label: "N/A" };
+
+      if (layerKey === "temp"){
+        const n = safeNum(p.temperature);
+        return (n == null) ? { n:null, label:"N/A" } : { n, label: `${Math.round(n)}F` };
+      }
+
+      if (layerKey === "dew"){
+        const cval = safeNum(p?.dewpoint?.value);
+        if (cval == null) return { n:null, label:"N/A" };
+        const f = (cval * 9/5) + 32;
+        return { n:f, label: `${Math.round(f)}F` };
+      }
+
+      if (layerKey === "wind"){
+        const mph = mphFromWindSpeedText(p.windSpeed);
+        return (mph == null) ? { n:null, label:"N/A" } : { n:mph, label: `${mph}` };
+      }
+
+      if (layerKey === "pop"){
+        const n = safeNum(p?.probabilityOfPrecipitation?.value);
+        return (n == null) ? { n:null, label:"N/A" } : { n, label: `${Math.round(n)}%` };
+      }
+
+      return { n:null, label:"N/A" };
+    }
+
+    function lerp(a,b,t){ return a + (b-a)*t; }
+
+    function colorFromStops01(x, stops01){
+      const s = Math.max(0, Math.min(1, x));
+      let a = stops01[0], b = stops01[stops01.length-1];
+
+      for (let i = 0; i < stops01.length - 1; i++){
+        if (s >= stops01[i].p && s <= stops01[i+1].p){
+          a = stops01[i];
+          b = stops01[i+1];
+          break;
+        }
+      }
+
+      const span = (b.p - a.p) || 1;
+      const tt = (s - a.p) / span;
+
+      const r = Math.round(lerp(a.c[0], b.c[0], tt));
+      const g = Math.round(lerp(a.c[1], b.c[1], tt));
+      const bl = Math.round(lerp(a.c[2], b.c[2], tt));
+      return `rgb(${r},${g},${bl})`;
+    }
+
+    function buildStops01(min, max, valueStops){
+      const denom = (max - min) || 1;
+      return valueStops.map(s => ({
+        p: (s.v - min) / denom,
+        c: s.c
+      }))
+      .map(s => ({ p: Math.max(0, Math.min(1, s.p)), c: s.c }))
+      .sort((a,b) => a.p - b.p);
+    }
+
+    function gradientFromStops01(stops01){
+      const parts = stops01.map(s => {
+        const pct = Math.round(s.p * 1000) / 10;
+        return `rgb(${s.c[0]},${s.c[1]},${s.c[2]}) ${pct}%`;
+      });
+      return `linear-gradient(90deg, ${parts.join(", ")})`;
+    }
+
+    const LAYERS = {
+      temp: {
+        title: "Temperature (°F)",
+        min: -20, max: 100,
+        ticks: [-20, 0, 32, 50, 70, 85, 100],
+        valueStops: [
+          { v:-20, c:[ 90,  25, 180] },
+          { v:  0, c:[ 35, 110, 255] },
+          { v: 32, c:[180, 245, 255] },
+          { v: 50, c:[ 60, 210, 120] },
+          { v: 70, c:[245, 220,  40] },
+          { v: 85, c:[245, 140,  30] },
+          { v:100, c:[220,  40,  40] },
+        ],
+      },
+      dew: {
+        title: "Dewpoint (°F)",
+        min: -10, max: 80,
+        ticks: [-10, 0, 20, 32, 50, 65, 80],
+        valueStops: [
+          { v:-10, c:[120, 140, 170] },
+          { v:  0, c:[ 70, 110, 220] },
+          { v: 20, c:[ 60, 200, 210] },
+          { v: 32, c:[ 55, 190, 120] },
+          { v: 50, c:[245, 210,  40] },
+          { v: 65, c:[245, 140,  30] },
+          { v: 80, c:[220,  40,  40] },
+        ],
+      },
+      wind: {
+        title: "Wind (mph)",
+        min: 0, max: 45,
+        ticks: [0, 5, 10, 20, 30, 40, 45],
+        valueStops: [
+          { v:  0, c:[210, 220, 235] },
+          { v: 10, c:[120, 200, 255] },
+          { v: 20, c:[ 60, 210, 120] },
+          { v: 30, c:[245, 210,  40] },
+          { v: 40, c:[245, 140,  30] },
+          { v: 45, c:[220,  40,  40] },
+        ],
+      },
+      pop: {
+        title: "Precip chance (%)",
+        min: 0, max: 100,
+        ticks: [0, 10, 25, 40, 60, 80, 100],
+        valueStops: [
+          { v:  0, c:[170, 180, 200] },
+          { v: 25, c:[160, 210, 255] },
+          { v: 40, c:[ 90, 170, 255] },
+          { v: 60, c:[ 30, 110, 255] },
+          { v: 80, c:[ 40,  60, 170] },
+          { v:100, c:[ 90,  30, 150] },
+        ],
+      },
+    };
+
+    for (const k of Object.keys(LAYERS)){
+      const L = LAYERS[k];
+      L.stops01 = buildStops01(L.min, L.max, L.valueStops);
+      L.gradientCss = gradientFromStops01(L.stops01);
+    }
+
+    function layerColor(layerKey, n){
+      if (n == null || !isFinite(n)) return "#9ca3af";
+      const L = LAYERS[layerKey];
+      const x = (Math.max(L.min, Math.min(L.max, n)) - L.min) / (L.max - L.min);
+      return colorFromStops01(x, L.stops01);
+    }
+
+    function updateTempLegend(layerKey){
+      const L = LAYERS[layerKey];
+      if ($("tempLegendTitle")) $("tempLegendTitle").textContent = L.title;
+      if ($("tempLegendBar")) $("tempLegendBar").style.background = L.gradientCss;
+      if ($("tempLegendTicks")) $("tempLegendTicks").innerHTML = L.ticks.map(v => `<span>${v}</span>`).join("");
+    }
+
+    function makeTempLabelHTML(text){
+      return `
+        <div style="
+          font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+          font-weight: 900;
+          font-size: 22px;
+          color: #ffffff;
+          letter-spacing: .2px;
+          line-height: 1;
+          background: transparent;
+          user-select: none;
+          -webkit-font-smoothing: antialiased;
+          text-rendering: geometricPrecision;
+          text-shadow:
+            -1px -1px 0 rgba(0,0,0,0.70),
+             1px -1px 0 rgba(0,0,0,0.70),
+            -1px  1px 0 rgba(0,0,0,0.70),
+             1px  1px 0 rgba(0,0,0,0.70),
+             0px  2px 8px rgba(0,0,0,0.45);
+        ">${text}</div>
+      `;
+    }
+
+    function rebuildTempLabels(){
+      if (!tempMap || !tempGeoLayer || !tempLabelLayer) return;
+
+      tempLabelLayer.clearLayers();
+
+      const z = tempMap.getZoom();
+      const isMobile = window.matchMedia("(max-width: 900px)").matches;
+      const minZoom = isMobile ? 6 : 7;
+      if (z < minZoom) return;
+
+      const used = [];
+      const minDistPx = 34;
+
+      tempGeoLayer.eachLayer((layer) => {
+        const geoid = pad5(layer.feature?.properties?.GEOID);
+        const t = layerValuesByGeoid[geoid];
+        const text = (t && t.n != null) ? t.label : "N/A";
+
+        const center = layer.getBounds().getCenter();
+        const p = tempMap.latLngToContainerPoint(center);
+
+        for (const u of used){
+          const dx = p.x - u.x;
+          const dy = p.y - u.y;
+          if ((dx*dx + dy*dy) < (minDistPx*minDistPx)) return;
+        }
+
+        used.push({ x:p.x, y:p.y });
+
+        const icon = L.divIcon({ className:"", html: makeTempLabelHTML(text), iconSize: null });
+        L.marker(center, { icon, interactive:false }).addTo(tempLabelLayer);
+      });
+    }
+
+    async function initTempMapIfNeeded(){
+      if (tempMap) return;
+
+      tempMap = L.map("tempMap", { zoomControl:true, zoomSnap:0.5, zoomDelta:0.5, wheelPxPerZoomLevel:140 });
+      tempMap.setView([35.9, -88.8], 7);
+
+      if (L.Browser.mobile){
+        tempMap.tap = true;
+        tempMap.dragging.enable();
+        tempMap.scrollWheelZoom.disable();
+      }
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(tempMap);
+
+      tempLabelLayer = L.layerGroup().addTo(tempMap);
+
+      const gj = await fetchJson(COUNTIES_GEOJSON);
+      tempGeoLayer = L.geoJSON(gj, {
+        style: (feature) => {
+          const geoid = pad5(feature?.properties?.GEOID);
+          const n = layerValuesByGeoid[geoid]?.n ?? null;
+          return {
+            color:"rgba(20,40,60,.65)",
+            weight:1,
+            fillColor: layerColor(currentMapLayer, n),
+            fillOpacity: 1
+          };
+        },
+        onEachFeature: (feature, layer) => {
+          const geoid = pad5(feature?.properties?.GEOID);
+          const c = countiesById[geoid];
+          const name = c ? `${c.county} County, ${c.state}` : (feature?.properties?.NAME || "County");
+          layer.bindTooltip(name, { sticky:true });
+        }
+      }).addTo(tempMap);
+
+      const b = tempGeoLayer.getBounds();
+      if (b && b.isValid()) tempMap.fitBounds(b.pad(0.08));
+
+      const relabel = debounce(() => rebuildTempLabels(), 120);
+      tempMap.on("zoomend", relabel);
+      tempMap.on("moveend", relabel);
+    }
+
+    async function refreshTempsAndRedraw(){
+      await initTempMapIfNeeded();
+
+      updateTempLegend(currentMapLayer);
+
+      layerValuesByGeoid = {};
+      if (tempLabelLayer) tempLabelLayer.clearLayers();
+
+      const items = counties.slice();
+      const concurrency = 4;
+      let i = 0;
+
+      async function worker(){
+        while (i < items.length){
+          const idx = i++;
+          const c = items[idx];
+          try{
+            const v = await getCountyLayerValue(c, currentMapLayer);
+            layerValuesByGeoid[pad5(c.id)] = v;
+          }catch{
+            layerValuesByGeoid[pad5(c.id)] = { n:null, label:"N/A" };
+          }
+        }
+      }
+
+      await Promise.all(Array.from({length: concurrency}, () => worker()));
+
+      if (tempGeoLayer){
+        tempGeoLayer.setStyle((feature) => {
+          const geoid = pad5(feature?.properties?.GEOID);
+          const n = layerValuesByGeoid[geoid]?.n ?? null;
+          return {
+            color:"rgba(20,40,60,.65)",
+            weight:1,
+            fillColor: layerColor(currentMapLayer, n),
+            fillOpacity: 1
+          };
+        });
+      }
+
+      rebuildTempLabels();
+    }
+
+    /* =========================
+       Radar
+       ========================= */
+
+    async function initRadarMapIfNeeded(){
+      if (radarMap) return;
+
+      radarMap = L.map("radarMap", { zoomControl:true, zoomSnap:0.5, zoomDelta:0.5, wheelPxPerZoomLevel:140 });
+      radarMap.setView([35.9, -88.8], 7);
+
+      if (L.Browser.mobile){
+        radarMap.tap = true;
+        radarMap.dragging.enable();
+        radarMap.scrollWheelZoom.disable();
+      }
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(radarMap);
+
+      radarWmsLayer = L.tileLayer.wms("https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r.cgi", {
+        layers: "nexrad-n0r-900913",
+        format: "image/png",
+        transparent: true,
+        opacity: Number(($("radarOpacity")?.value || 0.55))
+      }).addTo(radarMap);
+
+      const gj = await fetchJson(COUNTIES_GEOJSON);
+      radarCountyOutline = L.geoJSON(gj, {
+        style: () => ({ color: "rgba(0,0,0,0.90)", weight: 1.6, fillOpacity: 0 }),
+        onEachFeature: (feature, layer) => {
+          const geoid = pad5(feature?.properties?.GEOID);
+          const c = countiesById[geoid];
+          const name = c ? `${c.county} County, ${c.state}` : (feature?.properties?.NAME || "County");
+          layer.bindTooltip(name, { sticky:true });
+        }
+      }).addTo(radarMap);
+
+      const b = radarCountyOutline.getBounds();
+      if (b && b.isValid()) radarMap.fitBounds(b.pad(0.08));
+    }
+
+    function refreshRadar(){
+      if (!radarWmsLayer) return;
+      radarWmsLayer.setParams({ _cacheBust: Date.now() });
+      const now = new Intl.DateTimeFormat(undefined, { hour:"numeric", minute:"2-digit", second:"2-digit", hour12:true }).format(new Date());
+      if ($("radarLegendTime")) $("radarLegendTime").textContent = "Updated " + now;
+    }
+
+    /* =========================
+       Satellite
+       ========================= */
+
+    async function initSatMapIfNeeded(){
+      if (satMap) return;
+
+      satMap = L.map("satMap", { zoomControl:true, zoomSnap:0.5, zoomDelta:0.5, wheelPxPerZoomLevel:140 });
+      satMap.setView([35.9, -88.8], 5);
+
+      if (L.Browser.mobile){
+        satMap.tap = true;
+        satMap.dragging.enable();
+        satMap.scrollWheelZoom.disable();
+      }
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(satMap);
+
+      try{
+        const gj = await fetchJson(COUNTIES_GEOJSON);
+        satCountyOutline = L.geoJSON(gj, {
+          style: () => ({ color: "rgba(0,0,0,0.80)", weight: 1.2, fillOpacity: 0 })
+        }).addTo(satMap);
+
+        const b = satCountyOutline.getBounds();
+        if (b && b.isValid()) satMap.fitBounds(b.pad(0.10));
+      }catch{
+      }
+    }
+
+    async function refreshSatellite(){
+      await initSatMapIfNeeded();
+
+      const product = $("satProduct")?.value || "GOES-East_ABI_GeoColor";
+      const op = Number(($("satOpacity")?.value || 0.65));
+
+      if (satLayer){
+        satLayer.remove();
+        satLayer = null;
+      }
+
+      const wmsBase = "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi";
+
+      satLayer = L.tileLayer.wms(wmsBase, {
+        layers: product,
+        format: "image/png",
+        transparent: true,
+        opacity: op,
+        time: "default"
+      }).addTo(satMap);
+
+      if ($("satLegendTitle")) $("satLegendTitle").textContent = product.replaceAll("_"," ");
+      if ($("satLegendTime")) $("satLegendTime").textContent = "Live (default time)";
+    }
+
+    /* =========================
+       Alerts
+       ========================= */
+
+    const SIG_RANK = { warning: 4, watch: 3, advisory: 2, statement: 1, other: 0 };
+    const EVENT_COLOR = {
+      "Tornado Warning":              "#FF0000",
+      "Severe Thunderstorm Warning":  "#FFA500",
+      "Flash Flood Warning":          "#8B0000",
+      "Flood Warning":                "#00FF00",
+      "Flood Watch":                  "#2E8B57",
+      "High Wind Warning":            "#DAA520",
+      "Wind Advisory":                "#D2B48C",
+      "Winter Storm Warning":         "#FF69B4",
+      "Winter Storm Watch":           "#4682B4",
+      "Winter Weather Advisory":      "#7B68EE",
+      "Ice Storm Warning":            "#8A2BE2",
+      "Freezing Rain Advisory":       "#AFEEEE",
+      "Dense Fog Advisory":           "#708090",
+      "Special Weather Statement":    "#00FFFF",
+      "Red Flag Warning":             "#FF1493",
+      "Heat Advisory":                "#FF7F50",
+      "Excessive Heat Warning":       "#C71585",
+      "Tropical Storm Warning":       "#B22222",
+      "Hurricane Warning":            "#DC143C"
+    };
+
+    function sigFromEventName(event){
+      const e = String(event || "").toLowerCase();
+      if (e.includes("warning")) return "warning";
+      if (e.includes("watch")) return "watch";
+      if (e.includes("advisory")) return "advisory";
+      if (e.includes("statement")) return "statement";
+      return "other";
+    }
+
+    function fallbackEventColor(event){
+      const s = sigFromEventName(event);
+      if (s === "warning") return "#FF3B30";
+      if (s === "watch") return "#FF9500";
+      if (s === "advisory") return "#FFCC00";
+      if (s === "statement") return "#40C8FF";
+      return "#94A3B8";
+    }
+
+    function eventFillColor(event){
+      return EVENT_COLOR[event] || fallbackEventColor(event);
+    }
+
+    function rgba(hex, a){
+      const h = String(hex).replace("#","");
+      const r = parseInt(h.slice(0,2),16);
+      const g = parseInt(h.slice(2,4),16);
+      const b = parseInt(h.slice(4,6),16);
+      return `rgba(${r},${g},${b},${a})`;
+    }
+
+    function chooseBestAlert(existing, candidate){
+      if (!existing) return candidate;
+
+      const aSig = SIG_RANK[existing.sig] ?? 0;
+      const bSig = SIG_RANK[candidate.sig] ?? 0;
+      if (bSig !== aSig) return (bSig > aSig) ? candidate : existing;
+      return existing;
+    }
+
+    function countyAlertStyle(feature){
+      const geoid = pad5(feature?.properties?.GEOID);
+      const a = alertsByCounty[geoid];
+      const outline = "rgba(0,0,0,0.90)";
+
+      if (!a){
+        return { color:outline, weight:1.6, fillOpacity:0, fillColor:"rgba(0,0,0,0)" };
+      }
+
+      return {
+        color: outline,
+        weight: 1.6,
+        fillColor: rgba(a.color, alertFillOpacity),
+        fillOpacity: 1
+      };
+    }
+
+    async function fetchAlertsForCoverage(){
+      const states = uniq(counties.map(c => c.state)).filter(Boolean).sort();
+      const all = [];
+      for (const st of states){
+        const url = `https://api.weather.gov/alerts/active?area=${encodeURIComponent(st)}`;
+        try{
+          const data = await fetchJson(url);
+          const feats = Array.isArray(data?.features) ? data.features : [];
+          all.push(...feats);
+        }catch{}
+      }
+      return all;
+    }
+
+    function extractCountyIdsFromAlert(feature){
+      const props = feature?.properties || {};
+      const geocodes = props?.geocode || {};
+      const same = Array.isArray(geocodes.SAME) ? geocodes.SAME : [];
+      const out = new Set();
+
+      for (const code of same){
+        const s = String(code || "").trim();
+        if (/^\d{6}$/.test(s)){
+          out.add(s.slice(1)); // example "047017" -> "47017"
+        }
+      }
+      return Array.from(out).map(x => pad5(x)).filter(x => /^\d{5}$/.test(x));
+    }
+
+    function buildAlertsIndex(features){
+      const idx = {};
+      for (const f of (features || [])){
+        const props = f?.properties || {};
+        const ids = extractCountyIdsFromAlert(f);
+        for (const id of ids){
+          if (!idx[id]) idx[id] = [];
+          idx[id].push(props);
+        }
+      }
+      return idx;
+    }
+
+    function buildAlertsByCounty(features){
+      const by = {};
+      const typeCounts = {};
+
+      for (const f of (features || [])){
+        const props = f?.properties || {};
+        const event = props.event || "Alert";
+        const sig = sigFromEventName(event);
+        const url = props.web || props.uri || null;
+        const color = eventFillColor(event);
+
+        const candidate = { event, sig, color, url };
+
+        const countyIds = extractCountyIdsFromAlert(f);
+        for (const cid of countyIds){
+          if (!countiesById[cid]) continue;
+          by[cid] = chooseBestAlert(by[cid], candidate);
+          typeCounts[event] = (typeCounts[event] || 0) + 1;
+        }
+      }
+
+      return { by, typeCounts };
+    }
+
+    function buildAlertsLegend(typeCounts){
+      const entries = Object.entries(typeCounts || {})
+        .sort((a,b) => b[1] - a[1])
+        .slice(0, 8);
+
+      const root = $("alertLegendItems");
+      if (!root) return;
+      root.innerHTML = "";
+
+      if (!entries.length){
+        const row = document.createElement("div");
+        row.className = "msg";
+        row.style.margin = "6px 0 0 0";
+        row.textContent = "No active alerts in your coverage area.";
+        root.appendChild(row);
+        return;
+      }
+
+      for (const [event, count] of entries){
+        const row = document.createElement("div");
+        row.className = "alert-item";
+
+        const left = document.createElement("div");
+        left.className = "alert-left";
+
+        const sw = document.createElement("div");
+        sw.className = "swatch";
+        sw.style.background = rgba(eventFillColor(event), 0.75);
+
+        const name = document.createElement("div");
+        name.className = "alert-name";
+        name.textContent = event;
+
+        left.appendChild(sw);
+        left.appendChild(name);
+
+        const right = document.createElement("div");
+        right.style.color = "rgba(233,242,255,0.78)";
+        right.textContent = `${count}`;
+
+        row.appendChild(left);
+        row.appendChild(right);
+        root.appendChild(row);
+      }
+    }
+
+    function buildAlertsPopupHtml(geoid){
+      const list = alertsByGeoid?.[geoid] || [];
+      const c = countiesById?.[geoid];
+      const title = c ? `${c.county} County, ${c.state}` : `County ${geoid}`;
+
+      if (!list.length){
+        return `
+          <div class="hwl-popup-shell">
+            <div class="hwl-popup-title">${title}</div>
+            <div class="msg" style="margin:0;">No active alerts for this county.</div>
+          </div>
+        `;
+      }
+
+      const items = list.slice(0, 12).map((p) => {
+        const event = p?.event || "Alert";
+        const headline = p?.headline || "";
+        const ends = p?.ends || p?.expires || "";
+        const url = p?.web || p?.uri || "";
+
+        return `
+          <div class="hwl-popup-item">
+            <div class="hwl-popup-row">
+              <div class="hwl-popup-event">${event}</div>
+              <div class="hwl-popup-sev">${sigFromEventName(event).toUpperCase()}</div>
+            </div>
+            ${headline ? `<div class="hwl-popup-head">${headline}</div>` : ``}
+            ${ends ? `<div class="hwl-popup-exp">Ends: ${ends}</div>` : ``}
+            <div class="hwl-popup-actions">
+              ${url ? `<a class="hwl-a" href="${url}" target="_blank" rel="noopener noreferrer">Open official</a>` : ``}
+              <a class="hwl-a secondary" href="https://www.weather.gov/" target="_blank" rel="noopener noreferrer">weather.gov</a>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      return `
+        <div class="hwl-popup-shell">
+          <div class="hwl-popup-title">${title}</div>
+          <div class="hwl-popup-scroll">${items}</div>
+        </div>
+      `;
+    }
+
+    async function initAlertMapIfNeeded(){
+      if (alertMap) return;
+
+      alertMap = L.map("alertMap", { zoomControl:true, zoomSnap:0.5, zoomDelta:0.5, wheelPxPerZoomLevel:140 });
+      alertMap.setView([35.9, -88.8], 7);
+
+      if (L.Browser.mobile){
+        alertMap.tap = true;
+        alertMap.dragging.enable();
+        alertMap.scrollWheelZoom.disable();
+      }
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(alertMap);
+
+      const gj = await fetchJson(COUNTIES_GEOJSON);
+
+      alertCountyLayer = L.geoJSON(gj, {
+        style: (feature) => countyAlertStyle(feature),
+        onEachFeature: (feature, layer) => {
+          const geoid = pad5(feature?.properties?.GEOID);
+          layer.on("click", (e) => {
+            const html = buildAlertsPopupHtml(geoid);
+            layer.bindPopup(html, { maxWidth: 340, className: "hwl-alert-popup" }).openPopup(e.latlng);
+          });
+        }
+      }).addTo(alertMap);
+
+      const b = alertCountyLayer.getBounds();
+      if (b && b.isValid()) alertMap.fitBounds(b.pad(0.08));
+    }
+
+    async function refreshAlertsMap(){
+      await initAlertMapIfNeeded();
+
+      const feats = await fetchAlertsForCoverage();
+      const built = buildAlertsByCounty(feats);
+      alertsByCounty = built.by;
+      alertsByGeoid = buildAlertsIndex(feats);
+
+      let affected = 0;
+      for (const k in alertsByCounty){ if (alertsByCounty[k]) affected++; }
+      if ($("alertLegendMeta")) $("alertLegendMeta").textContent = `${affected} counties`;
+
+      buildAlertsLegend(built.typeCounts);
+
+      if (alertCountyLayer){
+        alertCountyLayer.setStyle((feature) => countyAlertStyle(feature));
+      }
+    }
+
+    /* =========================
+       SPC outlook
+       ========================= */
+
+    const SPC_LAYER_BY_DAY = { "1": 1, "2": 9, "3": 17 };
+
+    const SPC_CAT = [
+      { dn: 2, label: "TSTM", color: "#BDFFBD" },
+      { dn: 3, label: "MRGL", color: "#73B273" },
+      { dn: 4, label: "SLGT", color: "#F7F78F" },
+      { dn: 5, label: "ENH",  color: "#E69800" },
+      { dn: 6, label: "MDT",  color: "#FF0000" },
+      { dn: 8, label: "HIGH", color: "#FF00C5" }
+    ];
+
+    function spcDnToInfo(dn){
+      const n = Number(dn);
+      return SPC_CAT.find(x => x.dn === n) || { dn: n, label: "Risk", color: "#94A3B8" };
+    }
+
+    function buildSpcLegend(){
+      const root = $("spcLegendItems");
+      if (!root) return;
+      root.innerHTML = "";
+
+      for (const it of SPC_CAT){
+        const row = document.createElement("div");
+        row.className = "alert-item";
+
+        const left = document.createElement("div");
+        left.className = "alert-left";
+
+        const sw = document.createElement("div");
+        sw.className = "swatch";
+        sw.style.background = rgba(it.color, 0.75);
+
+        const name = document.createElement("div");
+        name.className = "alert-name";
+        name.textContent = it.label;
+
+        left.appendChild(sw);
+        left.appendChild(name);
+
+        row.appendChild(left);
+        root.appendChild(row);
+      }
+    }
+
+    async function fetchSpcGeoJson(layerId){
+      const base = "https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/FeatureServer";
+      const url = `${base}/${layerId}/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson`;
+      return await fetchJson(url);
+    }
+
+    async function initSpcMapIfNeeded(){
+      if (spcMap) return;
+
+      spcMap = L.map("spcMap", { zoomControl:true, zoomSnap:0.5, zoomDelta:0.5, wheelPxPerZoomLevel:140 });
+      spcMap.setView([36.2, -89.0], 5);
+
+      if (L.Browser.mobile){
+        spcMap.tap = true;
+        spcMap.dragging.enable();
+        spcMap.scrollWheelZoom.disable();
+      }
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(spcMap);
+
+      try{
+        const gj = await fetchJson(COUNTIES_GEOJSON);
+        spcCountyOutline = L.geoJSON(gj, {
+          style: () => ({ color: "rgba(0,0,0,0.80)", weight: 1.3, fillOpacity: 0 })
+        }).addTo(spcMap);
+      }catch{}
+
+      buildSpcLegend();
+    }
+
+    async function refreshSpcOutlook(){
+      await initSpcMapIfNeeded();
+
+      const day = $("spcDaySelect")?.value || "1";
+      const layerId = SPC_LAYER_BY_DAY[day] ?? 1;
+
+      const gj = await fetchSpcGeoJson(layerId);
+
+      if (spcOutlookLayer){
+        spcOutlookLayer.remove();
+        spcOutlookLayer = null;
+      }
+
+      spcOutlookLayer = L.geoJSON(gj, {
+        style: (feature) => {
+          const dn = feature?.properties?.dn;
+          const info = spcDnToInfo(dn);
+          return {
+            color: "rgba(0,0,0,0.85)",
+            weight: 1.2,
+            fillColor: info.color,
+            fillOpacity: 0.40
+          };
+        }
+      }).addTo(spcMap);
+
+      const b = spcOutlookLayer.getBounds();
+      if (b && b.isValid()) spcMap.fitBounds(b.pad(0.08));
+
+      const stamp = new Intl.DateTimeFormat(undefined, { hour:"numeric", minute:"2-digit", second:"2-digit", hour12:true }).format(new Date());
+      if ($("spcLegendTime")) $("spcLegendTime").textContent = "Updated " + stamp;
+    }
+
+    /* =========================
+       Graphs
+       ========================= */
+
+    function parseWindSpeedMph(windSpeedStr){
+      if (!windSpeedStr) return null;
+      const s = String(windSpeedStr);
+      const nums = s.match(/(\d+(\.\d+)?)/g);
+      if (!nums || nums.length === 0) return null;
+      const vals = nums.map(n => Number(n)).filter(Number.isFinite);
+      if (!vals.length) return null;
+      return vals.reduce((a,b)=>a+b,0) / vals.length;
+    }
+    function dewpointFFromPeriod(p){
+      const c = safeNum(p?.dewpoint?.value);
+      if (c == null) return null;
+      return (c * 9/5) + 32;
+    }
+    function popFromPeriod(p){
+      const v = safeNum(p?.probabilityOfPrecipitation?.value);
+      return v == null ? null : v;
+    }
+
+    function buildOrUpdateCountyChart(labels, series){
+      const canvas = document.getElementById("countyChart");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+
+      const data = {
+        labels,
+        datasets: [
+          { label: "Temp (°F)", data: series.tempF, yAxisID: "yTemp", tension: 0.25, pointRadius: 2 },
+          { label: "Dewpoint (°F)", data: series.dewF, yAxisID: "yTemp", tension: 0.25, pointRadius: 2 },
+          { label: "Precip chance (%)", data: series.pop, yAxisID: "yPop", tension: 0.25, pointRadius: 2 },
+          { label: "Wind (mph)", data: series.windMph, yAxisID: "yWind", tension: 0.25, pointRadius: 2 }
+        ]
+      };
+
+      const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { labels: { color: "#e9f2ff" } } },
+        scales: {
+          x: { ticks: { color: "rgba(233,242,255,0.85)" }, grid: { color: "rgba(255,255,255,0.06)" } },
+          yTemp: { position: "left", ticks: { color: "rgba(233,242,255,0.85)" }, grid: { color: "rgba(255,255,255,0.06)" } },
+          yPop: { position: "right", min: 0, max: 100, ticks: { color: "rgba(233,242,255,0.75)" }, grid: { drawOnChartArea: false } },
+          yWind:{ position: "right", ticks: { color: "rgba(233,242,255,0.75)" }, grid: { drawOnChartArea: false }, offset: true }
+        }
+      };
+
+      if (countyChart){
+        countyChart.data = data;
+        countyChart.options = options;
+        countyChart.update();
+        return;
+      }
+      countyChart = new Chart(ctx, { type: "line", data, options });
+    }
+
+    function graphSetMsg(text, bad=false){
+      const box = $("graphMsg");
+      if (!box) return;
+      box.textContent = text;
+      box.className = "msg" + (bad ? " bad" : "");
+    }
+
+    function fillGraphCountyDropdown(){
+      const sel = $("graphCountySelect");
+      if (!sel) return;
+
+      const items = counties.slice().sort((a,b) => {
+        const A = (a.state + a.county).toLowerCase();
+        const B = (b.state + b.county).toLowerCase();
+        return A.localeCompare(B);
+      });
+
+      sel.innerHTML = `<option value="">Select a county</option>` + items.map(c => {
+        const id = pad5(c.id);
+        const label = `${c.county} County, ${c.state}`;
+        return `<option value="${id}">${label}</option>`;
+      }).join("");
+    }
+
+    function filterGraphCountyDropdown(){
+      const q = ($("graphSearch")?.value || "").trim().toLowerCase();
+      const sel = $("graphCountySelect");
+      if (!sel) return;
+
+      if (!q){
+        fillGraphCountyDropdown();
+        return;
+      }
+
+      const items = counties
+        .filter(c => (`${c.county} ${c.state}`.toLowerCase().includes(q)))
+        .sort((a,b) => ((a.state + a.county).toLowerCase()).localeCompare((b.state + b.county).toLowerCase()));
+
+      sel.innerHTML = `<option value="">Select a county</option>` + items.map(c => {
+        const id = pad5(c.id);
+        const label = `${c.county} County, ${c.state}`;
+        return `<option value="${id}">${label}</option>`;
+      }).join("");
+
+      if (items.length === 1){
+        sel.value = pad5(items[0].id);
+        if ($("graphLoadBtn")) $("graphLoadBtn").disabled = false;
+      }
+    }
+
+    async function loadCountyGraph(geoid){
+      const c = countiesById[pad5(geoid)];
+      if (!c){
+        graphSetMsg("That county was not found in counties.json.", true);
+        return;
+      }
+
+      const url = c?.nws?.forecastHourly;
+      if (!url){
+        graphSetMsg("No hourly forecast URL found for this county.", true);
+        return;
+      }
+
+      graphSetMsg(`Loading next 12 hours for ${c.county} County, ${c.state}...`);
+
+      try{
+        const data = await fetchJson(url);
+        const periods = data?.properties?.periods;
+
+        if (!Array.isArray(periods) || periods.length === 0){
+          throw new Error("Hourly forecast returned no periods.");
+        }
+
+        const take = periods.slice(0, 12);
+        const labels = take.map(p => p.startTime ? toHourLabel(p.startTime) : "");
+        const series = {
+          tempF: take.map(p => safeNum(p.temperature)),
+          dewF: take.map(p => dewpointFFromPeriod(p)),
+          pop: take.map(p => popFromPeriod(p)),
+          windMph: take.map(p => parseWindSpeedMph(p.windSpeed))
+        };
+
+        buildOrUpdateCountyChart(labels, series);
+
+        if ($("graphsMeta")) $("graphsMeta").textContent = `${c.county} County, ${c.state} · Next 12 hours`;
+        graphSetMsg("Graph loaded.");
+      }catch(err){
+        graphSetMsg(String(err.message || err), true);
+      }
+    }
+
+    /* =========================
+       View switching and refresh timers
+       ========================= */
+
+    async function setView(v){
+      currentView = v;
+
+      if ($("viewAbout")) $("viewAbout").classList.toggle("active", v === "about");
+      if ($("viewForecast")) $("viewForecast").classList.toggle("active", v === "forecast");
+      if ($("viewTemps")) $("viewTemps").classList.toggle("active", v === "temps");
+      if ($("viewRadar")) $("viewRadar").classList.toggle("active", v === "radar");
+      if ($("viewSat")) $("viewSat").classList.toggle("active", v === "sat");
+      if ($("viewAlerts")) $("viewAlerts").classList.toggle("active", v === "alerts");
+      if ($("viewGraphs")) $("viewGraphs").classList.toggle("active", v === "graphs");
+      if ($("viewSpc")) $("viewSpc").classList.toggle("active", v === "spc");
+
+      setDrawerActive(v);
+
+      if (!counties.length) await loadCounties();
+
+      if (v === "forecast"){
+        applyFilters();
+      }
+
+      if (v === "temps"){
+        if ($("mapLayer")) $("mapLayer").value = currentMapLayer;
+        await refreshTempsAndRedraw();
+        invalidateMap(tempMap);
+      }
+
+      if (v === "radar"){
+        await initRadarMapIfNeeded();
+        invalidateMap(radarMap);
+        refreshRadar();
+      }
+
+      if (v === "sat"){
+        await refreshSatellite();
+        invalidateMap(satMap);
+      }
+
+      if (v === "alerts"){
+        await refreshAlertsMap();
+        invalidateMap(alertMap);
+      }
+
+      if (v === "graphs"){
+        fillGraphCountyDropdown();
+        graphSetMsg("Pick a county to graph the next 12 hours.");
+        if ($("graphLoadBtn")) $("graphLoadBtn").disabled = true;
+        setTimeout(() => { if (countyChart) countyChart.resize(); }, 120);
+      }
+
+      if (v === "spc"){
+        await refreshSpcOutlook();
+        invalidateMap(spcMap);
+      }
+
+      if (v === "about"){
+        initTodayAtAGlance();
+      }
+    }
+
+    const TEN_MIN = 10 * 60 * 1000;
+    const FIVE_MIN = 5 * 60 * 1000;
+    const ONE_MIN = 60 * 1000;
+
+    setInterval(async () => {
+      try{
+        if (currentView === "temps"){
+          await refreshTempsAndRedraw();
+        }
+      }catch(e){
+        console.warn("10 min refresh failed:", e);
+      }
+    }, TEN_MIN);
+
+    setInterval(() => {
+      try{
+        if (currentView === "radar"){
+          refreshRadar();
+        }
+      }catch(e){
+        console.warn("5 min radar refresh failed:", e);
+      }
+    }, FIVE_MIN);
+
+    setInterval(async () => {
+      try{
+        if (currentView === "alerts"){
+          await refreshAlertsMap();
+        }
+      }catch(e){
+        console.warn("1 min alerts refresh failed:", e);
+      }
+    }, ONE_MIN);
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      fmtLocalTime();
+      setInterval(fmtLocalTime, 1000);
+
+      updateTempLegend("temp");
+
+      on("openDrawerBtn", "click", () => openDrawer());
+      on("closeDrawerBtn", "click", () => closeDrawer());
+      on("drawerOverlay", "click", () => closeDrawer());
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeDrawer();
+      });
+
+      document.querySelectorAll("#drawerList .drawerItem").forEach((item) => {
+        item.addEventListener("click", async () => {
+          const v = item.dataset.view;
+          closeDrawer();
+          await setView(v);
+        });
+      });
+
+      on("searchBox", "input", debounce(() => {
+        if (counties.length) applyFilters();
+      }, 80));
+
+      on("stateFilter", "change", () => {
+        if (counties.length) applyFilters();
+      });
+
+      on("btnForecast", "click", getForecast);
+      on("btnHourly", "click", getHourly);
+      on("btnNWS", "click", openNWSMapClick);
+
+      on("tabForecast", "click", () => {
+        showTab("forecast");
+        if (forecastData) renderForecast();
+        else if ($("forecastPane")) $("forecastPane").innerHTML = "";
+      });
+
+      on("tabHourly", "click", () => {
+        showTab("hourly");
+        if (hourlyData) renderHourly();
+        else if ($("hourlyPane")) $("hourlyPane").innerHTML = "";
+      });
+
+      on("mapLayer", "change", async (e) => {
+        currentMapLayer = e.target.value;
+        if (currentView === "temps"){
+          await refreshTempsAndRedraw();
+        }
+      });
+
+      on("radarOpacity", "change", () => {
+        if (radarWmsLayer) radarWmsLayer.setOpacity(Number(($("radarOpacity")?.value || 0.55)));
+      });
+
+      on("radarRefreshBtn", "click", () => refreshRadar());
+
+      on("satRefreshBtn", "click", async () => {
+        await refreshSatellite();
+      });
+
+      on("satProduct", "change", async () => {
+        if (currentView === "sat"){
+          await refreshSatellite();
+        }
+      });
+
+      on("satOpacity", "change", () => {
+        if (satLayer) satLayer.setOpacity(Number(($("satOpacity")?.value || 0.65)));
+      });
+
+      on("alertsOpacity", "change", () => {
+        alertFillOpacity = Number(($("alertsOpacity")?.value || 0.60));
+        if (alertCountyLayer) alertCountyLayer.setStyle((feature) => countyAlertStyle(feature));
+      });
+
+      on("alertsRefreshBtn", "click", async () => {
+        await refreshAlertsMap();
+      });
+
+      on("graphSearch", "input", debounce(() => {
+        filterGraphCountyDropdown();
+      }, 120));
+
+      on("graphCountySelect", "change", (e) => {
+        if ($("graphLoadBtn")) $("graphLoadBtn").disabled = !e.target.value;
+      });
+
+      on("graphLoadBtn", "click", async () => {
+        const geoid = $("graphCountySelect")?.value || "";
+        if (!geoid) return;
+        await loadCountyGraph(geoid);
+      });
+
+      on("spcRefreshBtn", "click", async () => {
+        await refreshSpcOutlook();
+      });
+
+      on("spcDaySelect", "change", async () => {
+        if (currentView === "spc"){
+          await refreshSpcOutlook();
+        }
+      });
+
+      on("tempFullscreenBtn", "click", async () => toggleMapFullscreen("tempMap", tempMap));
+      on("radarFullscreenBtn", "click", async () => toggleMapFullscreen("radarMap", radarMap));
+      on("satFullscreenBtn", "click", async () => toggleMapFullscreen("satMap", satMap));
+      on("alertsFullscreenBtn", "click", async () => toggleMapFullscreen("alertMap", alertMap));
+      on("spcFullscreenBtn", "click", async () => toggleMapFullscreen("spcMap", spcMap));
+
+      await loadCounties();
+      await setView("about");
+    });
+  </script>
+</body>
+</html>
+
+
+
+
+
