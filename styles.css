@@ -1,0 +1,215 @@
+:root{
+  --bg:#0b1220;
+  --card:#101a2b;
+  --card2:#0f1a2a;
+  --text:#e9eef8;
+  --muted:#a8b3c7;
+  --line:rgba(255,255,255,.10);
+  --accent:#ff8200;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  background: radial-gradient(1200px 800px at 20% 0%, rgba(255,130,0,.08), transparent 60%),
+              radial-gradient(900px 700px at 100% 10%, rgba(120,170,255,.08), transparent 55%),
+              var(--bg);
+  color:var(--text);
+  transform: scale(0.97);
+  transform-origin: top center;
+}
+
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+  backdrop-filter: blur(10px);
+  position:sticky;
+  top:0;
+  z-index:10;
+  background: rgba(11,18,32,.65);
+}
+
+.brand{display:flex;align-items:center;gap:12px}
+.logo{
+  width:42px;height:42px;
+  object-fit:contain;
+  border-radius:10px;
+  background: rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.10);
+  padding:6px;
+}
+.brandName{font-weight:800;letter-spacing:.2px}
+.brandSub{font-size:12px;color:var(--muted);margin-top:2px}
+
+.topActions{display:flex;gap:10px;align-items:center}
+
+.wrap{
+  display:grid;
+  grid-template-columns: 340px 1fr;
+  gap:14px;
+  padding:14px;
+  max-width: 1200px;
+  margin:0 auto;
+}
+
+.panel{
+  background: linear-gradient(180deg, rgba(255,255,255,.04), transparent 40%), var(--card);
+  border:1px solid var(--line);
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+}
+
+.panelHeader{
+  padding:14px;
+  border-bottom:1px solid var(--line);
+  background: rgba(255,255,255,.03);
+}
+.panelHeader h2{margin:0;font-size:16px}
+
+.input{
+  width:100%;
+  margin-top:10px;
+  padding:10px 10px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.15);
+  color:var(--text);
+  outline:none;
+}
+
+.list{max-height: calc(100vh - 190px); overflow:auto}
+.item{
+  padding:10px 14px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+}
+.item:hover{background: rgba(255,255,255,.03)}
+.item.active{background: rgba(255,130,0,.12)}
+.item .name{font-weight:650}
+.item .state{color:var(--muted);font-size:12px;margin-top:2px}
+
+.right .panelHeader{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+.tabs{display:flex;gap:8px}
+.tab{
+  padding:8px 10px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.12);
+  color:var(--text);
+  cursor:pointer;
+}
+.tab.active{
+  border-color: rgba(255,130,0,.35);
+  background: rgba(255,130,0,.14);
+}
+
+.status{
+  padding:10px 14px;
+  color:var(--muted);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  min-height: 38px;
+}
+
+.content{padding:14px}
+.hidden{display:none}
+
+.btn{
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.12);
+  cursor:pointer;
+  background: rgba(0,0,0,.14);
+  color:var(--text);
+}
+.btn-primary{
+  border-color: rgba(255,130,0,.35);
+  background: rgba(255,130,0,.16);
+}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.card{
+  background: rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:14px;
+  padding:12px;
+  margin-bottom:10px;
+}
+.card .t{font-weight:750}
+.card .d{color:var(--muted);margin-top:6px;line-height:1.35}
+
+.hourRow{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  padding:10px 0;
+}
+.hourRow:last-child{border-bottom:none}
+.hourLeft{display:flex;flex-direction:column;gap:3px}
+.hourName{font-weight:750}
+.hourMeta{color:var(--muted);font-size:12px}
+.badge{
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.12);
+  align-self:flex-start;
+  white-space:nowrap;
+}
+.badge.now{
+  border-color: rgba(255,130,0,.45);
+  background: rgba(255,130,0,.16);
+}
+
+.footer{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 10px 14px 18px 14px;
+  color:var(--muted);
+  font-size:12px;
+}
+
+@media (max-width: 900px){
+  body{transform:none}
+  .wrap{grid-template-columns: 1fr}
+  .list{max-height: 40vh}
+}
+/* --- Logo: remove the "boxed" look completely --- */
+.brand {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.brand .logo,
+#brandLogo {
+  display: block;
+  height: 44px;           /* tweak smaller or bigger */
+  width: auto;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* If your CSS wraps the logo in a pill/card, kill that too */
+.brand * {
+  box-shadow: none;
+}
